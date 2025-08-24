@@ -1,0 +1,717 @@
+<!-- File: /inventory/index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventario de Obras</title>
+  <style>
+    /* Paleta sobria + brutalismo */
+    :root{
+      --ink:#0b1220;            /* azul casi negro */
+      --bg:#f7f8fb;
+      --primary:#0d2a4a;        /* azul oscuro */
+      --primary-ink:#ffffff;
+      --accent:#6b7a99;         /* gris azulado */
+      --danger:#c0362c;
+      --ok:#2f7d31;
+      --bw:3px;
+      --pad:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font:16px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    /* Header - móvil primero */
+    header{
+      background:var(--primary);
+      color:var(--primary-ink);
+      border-bottom:var(--bw) solid #000;
+      padding:16px;
+      position:sticky; top:0; z-index:10;
+      box-shadow:8px 8px 0 #00000022;
+    }
+    .header-bar{display:grid; gap:10px}
+    .title{font-weight:800; font-size:20px; letter-spacing:.3px}
+    .header-controls{
+      display:grid; gap:8px;
+      grid-template-columns: 1fr 1fr;
+    }
+    .header-controls .row{
+      display:grid; gap:8px; grid-template-columns: 1fr auto auto;
+    }
+
+    /* Controles base */
+    select, input[type="text"], input[type="number"], textarea{
+      border:var(--bw) solid #000; background:#fff; padding:10px; min-height:44px; width:100%;
+    }
+    button{
+      border:var(--bw) solid #000; background:#fff; color:#000; padding:10px 14px; min-height:44px; cursor:pointer;
+      box-shadow:4px 4px 0 #000; transition:transform .02s;
+    }
+    button:active{transform:translate(2px,2px); box-shadow:2px 2px 0 #000}
+    .btn-primary{background:var(--accent); color:#000}
+    .btn-secondary{background:#e9edf3}
+    .btn-danger{background:var(--danger); color:#fff}
+    .btn-dark{background:#111; color:#fff}
+    .btn-icon{width:44px; height:44px; display:grid; place-items:center; padding:0}
+
+    /* Layout principal */
+    .container{max-width:1100px; margin:18px auto; padding:0 12px; display:grid; gap:16px}
+    .panel{border:var(--bw) solid #000; background:#fff; padding:16px; box-shadow:8px 8px 0 #0000001a}
+    .panel h2{margin:0 0 10px; font-size:18px}
+
+    /* Grids responsivos */
+    .grid{display:grid; gap:10px}
+    .cols-2{grid-template-columns:1fr}
+    .cols-3{grid-template-columns:1fr}
+    @media (min-width:800px){
+      .header-bar{grid-template-columns:auto 1fr}
+      .header-controls{grid-template-columns: 1fr auto auto}
+      .cols-2{grid-template-columns:repeat(2,1fr)}
+      .cols-3{grid-template-columns:repeat(3,1fr)}
+    }
+
+    /* Tabla */
+    .table-wrap{overflow:auto; border:var(--bw) solid #000; background:#fff}
+    table{width:100%; border-collapse:collapse}
+    th,td{border-bottom:var(--bw) solid #000; padding:10px; vertical-align:top}
+    thead th{background:#f1f4f9; position:sticky; top:0}
+    tr:hover td{background:#f9fbff}
+    .row-actions{display:flex; gap:6px; flex-wrap:wrap}
+
+    /* Form */
+    .form-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    label b{display:block; margin-bottom:4px}
+    .muted{color:#6b7280; font-size:14px}
+
+    /* Chips / contadores */
+    .counters{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{border:var(--bw) solid #000; background:#fff; padding:6px 10px}
+
+    /* Alertas */
+    .alert{border:var(--bw) solid #000; padding:10px; margin:10px 0}
+    .alert.success{background:#e6f6e6}
+    .alert.error{background:#ffe9e9}
+
+    /* Modal */
+    dialog{border:var(--bw) solid #000; padding:0; max-width:560px; width:92vw}
+    dialog::backdrop{background:#00000080}
+    .modal-header{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#0f1b31; color:#fff}
+    .modal-content{padding:14px}
+
+    /* Accesibilidad */
+    :focus-visible{outline:3px solid #000; outline-offset:2px}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-bar">
+      <div class="title">Inventario de Obras</div>
+      <div class="header-controls">
+        <div class="row">
+          <select id="obraSelect" aria-label="Seleccionar obra">
+            <option value="">— Seleccionar Obra —</option>
+          </select>
+          <button type="button" id="editObraBtn" class="btn-secondary" title="Editar obra">✎</button>
+          <button type="button" id="deleteObraBtn" class="btn-danger btn-icon" title="Eliminar obra">🗑️</button>
+        </div>
+        <button type="button" id="nuevaObraBtn" class="btn-primary">Nueva Obra</button>
+        <div class="row">
+          <button type="button" id="exportBtn" class="btn-secondary">Exportar JSON</button>
+          <label for="importFile" class="btn-secondary" role="button" aria-controls="importFile">Importar JSON</label>
+          <input type="file" id="importFile" class="hidden" accept=".json" />
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel" aria-labelledby="como-usar">
+      <h2 id="como-usar">Cómo usar</h2>
+      <ol class="muted">
+        <li>“Nueva Obra”, luego selecciónala arriba.</li>
+        <li>Rellena el formulario y agrega ítems.</li>
+        <li>Filtra/busca y ajusta cantidades con +/-.</li>
+        <li>Exporta/Importa tus datos (JSON).</li>
+      </ol>
+      <p class="muted">Los datos se guardan en este navegador (<code>localStorage</code>).</p>
+    </section>
+
+    <!-- Filtros -->
+    <section class="panel" aria-labelledby="filtros">
+      <h2 id="filtros">Filtros</h2>
+      <div class="grid cols-3">
+        <div>
+          <label><b>Categoría</b></label>
+          <div class="row-actions" role="group" aria-label="Categoría">
+            <label><input type="radio" name="categoria" value="" checked> Todas</label>
+            <label><input type="radio" name="categoria" value="herramienta"> Herramientas</label>
+            <label><input type="radio" name="categoria" value="material"> Materiales</label>
+          </div>
+        </div>
+        <div id="subtipoFilter">
+          <label><b>Subtipo de Herramienta</b></label>
+          <div class="row-actions" role="group" aria-label="Subtipo">
+            <label><input type="radio" name="subtipo" value="" checked> Todos</label>
+            <label><input type="radio" name="subtipo" value="electrica"> Eléctrica</label>
+            <label><input type="radio" name="subtipo" value="manual"> Manual</label>
+          </div>
+        </div>
+        <div>
+          <label for="searchInput"><b>Buscar por nombre</b></label>
+          <input type="text" id="searchInput" placeholder="Escribe para buscar..." />
+        </div>
+      </div>
+    </section>
+
+    <!-- Formulario Ítems -->
+    <section class="panel" aria-labelledby="formTitle">
+      <h2 id="formTitle">Agregar Ítem</h2>
+      <div id="alertContainer" aria-live="polite"></div>
+      <form id="itemForm" novalidate>
+        <div class="grid cols-3">
+          <div>
+            <label for="itemNombre"><b>Nombre *</b></label>
+            <input id="itemNombre" required />
+            <div id="itemNombre-error" class="alert error hidden"></div>
+          </div>
+          <div>
+            <label for="itemCategoria"><b>Categoría *</b></label>
+            <select id="itemCategoria" required>
+              <option value="">— Seleccionar —</option>
+              <option value="herramienta">Herramienta</option>
+              <option value="material">Material</option>
+            </select>
+            <div id="itemCategoria-error" class="alert error hidden"></div>
+          </div>
+          <div id="subtipoGroup">
+            <label for="itemSubtipo"><b>Subtipo</b></label>
+            <select id="itemSubtipo">
+              <option value="">— Seleccionar —</option>
+              <option value="electrica">Eléctrica</option>
+              <option value="manual">Manual</option>
+            </select>
+            <div id="itemSubtipo-error" class="alert error hidden"></div>
+          </div>
+
+          <div>
+            <label for="itemMarca"><b>Marca *</b></label>
+            <select id="itemMarca" required></select>
+            <div id="itemMarca-error" class="alert error hidden"></div>
+          </div>
+          <div id="marcaNuevaWrap" class="hidden">
+            <label for="itemMarcaNueva"><b>Nueva marca</b></label>
+            <input id="itemMarcaNueva" placeholder="Introduce la marca y guarda" />
+          </div>
+
+          <div>
+            <label for="itemUbicacion"><b>Ubicación</b></label>
+            <input id="itemUbicacion" placeholder="ej: Almacén 1 / Estante A" />
+          </div>
+          <div style="grid-column:1/-1">
+            <label for="itemObservaciones"><b>Observaciones</b></label>
+            <textarea id="itemObservaciones" rows="3" placeholder="Notas adicionales..."></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="submitBtn" class="btn-dark">Agregar Ítem</button>
+          <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tabla Inventario -->
+    <section class="panel" aria-labelledby="inventario">
+      <h2 id="inventario">Inventario</h2>
+      <div class="counters">
+        <div class="chip">Ítems visibles: <strong id="visibleCount">0</strong></div>
+        <div class="chip">Total: <strong id="totalCount">0</strong></div>
+      </div>
+      <div class="table-wrap" role="region" aria-label="Tabla de inventario">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Categoría</th><th>Subtipo</th>
+              <th>Cantidad</th><th>Marca</th><th>Ubicación</th>
+              <th>Observaciones</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" style="text-align:center;padding:20px">Selecciona una obra para ver el inventario</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Obras -->
+  <dialog id="obraModal" aria-labelledby="obraModalTitle">
+    <div class="modal-header">
+      <h3 id="obraModalTitle">Nueva Obra</h3>
+      <button type="button" class="btn-icon" aria-label="Cerrar" data-close>✕</button>
+    </div>
+    <div class="modal-content">
+      <form id="obraForm" novalidate>
+        <label for="obraNombre"><b>Nombre de la Obra *</b></label>
+        <input id="obraNombre" required />
+        <div id="obraNombre-error" class="alert error hidden"></div>
+        <div class="form-actions">
+          <button type="submit" id="obraSubmitBtn" class="btn-dark">Crear Obra</button>
+          <button type="button" id="obraCancelBtn" class="btn-secondary" data-close>Cancelar</button>
+          <button type="button" id="obraDeleteBtn" class="btn-danger hidden">Eliminar Obra</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <script>
+    // --- Config & estado ---
+    const CONFIG = { storageKey: 'obraInv_v1', version: 2 }; // v2: unidad -> marca
+
+    const BRANDS = new Set([
+      'Hilti','Makita','Milwaukee','Bosch','DeWalt','Metabo','Festool','Stanley',
+      'Ridgid','HiKOKI','Einhell','Black+Decker','Bellota','Sika','Bosch Professional'
+    ]);
+
+    let state = {
+      obras: [],
+      items: [],
+      selectedObraId: '',
+      editingItemId: null,
+      filters: { categoria: '', subtipo: '', search: '' }
+    };
+
+    // --- Helpers ---
+    const qs = (s, el=document) => el.querySelector(s);
+    const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+    const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(36).slice(2,9)}`);
+    const show = (el) => el.classList.remove('hidden');
+    const hide = (el) => el.classList.add('hidden');
+    const cap = (s)=>s ? s[0].toUpperCase()+s.slice(1) : s;
+
+    // --- Storage + migración ---
+    const Storage = {
+      load(){
+        try{
+          const raw = localStorage.getItem(CONFIG.storageKey);
+          if(raw){
+            const parsed = JSON.parse(raw);
+            const data = { version: parsed.version||1, obras: parsed.obras||[], items: parsed.items||[] };
+            return this.migrate(data);
+          }
+        }catch(e){ console.error('load', e); }
+        return this.defaults();
+      },
+      save(){
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify({ version: CONFIG.version, obras: state.obras, items: state.items }));
+      },
+      export(){
+        const blob = new Blob([JSON.stringify({version:CONFIG.version, obras:state.obras, items:state.items}, null, 2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob); const a = document.createElement('a');
+        a.href = url; a.download = `inventario-obras-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      },
+      async import(file){
+        const txt = await file.text();
+        const data = JSON.parse(txt);
+        if(!data || !Array.isArray(data.obras) || !Array.isArray(data.items)) throw new Error('Formato inválido');
+        const migrated = this.migrate({version:data.version||1, obras:data.obras, items:data.items});
+        state.obras = migrated.obras; state.items = migrated.items;
+        if(!state.obras.find(o=>o.id===state.selectedObraId)) state.selectedObraId='';
+        this.save();
+      },
+      migrate(data){
+        // Por qué: mantener compatibilidad con v1 (unidad -> marca)
+        if((data.version||1) < 2){
+          data.items = data.items.map(it=>{
+            if(!it.marca && it.unidad){ it.marca = it.unidad; }
+            delete it.unidad;
+            return it;
+          });
+          data.version = 2;
+        }
+        return data;
+      },
+      defaults(){
+        return {
+          version: 2,
+          obras: [
+            { id: 'obra_001', nombre: 'Residencial Sur' },
+            { id: 'obra_002', nombre: 'Edificio Comercial Norte' }
+          ],
+          items: [
+            { id:'itm_001', obraId:'obra_001', nombre:'Taladro GSB 13', categoria:'herramienta', subtipo:'electrica', cantidad:3, marca:'Bosch', ubicacion:'Almacén 1 / B', observaciones:'Revisión mensual' },
+            { id:'itm_002', obraId:'obra_001', nombre:'Cemento CEM II', categoria:'material', subtipo:'', cantidad:40, marca:'Sika', ubicacion:'Patio', observaciones:'' },
+            { id:'itm_003', obraId:'obra_001', nombre:'Martillo 20oz', categoria:'herramienta', subtipo:'manual', cantidad:5, marca:'Stanley', ubicacion:'Almacén 1 / A', observaciones:'Mango de fibra' },
+            { id:'itm_004', obraId:'obra_002', nombre:'Sierra Circular', categoria:'herramienta', subtipo:'electrica', cantidad:2, marca:'Makita', ubicacion:'Taller', observaciones:'Incluye disco' },
+            { id:'itm_005', obraId:'obra_002', nombre:'Arena Gruesa', categoria:'material', subtipo:'', cantidad:15, marca:'—', ubicacion:'Patio Trasero', observaciones:'Para hormigón' }
+          ]
+        }
+      }
+    };
+
+    // --- Validación ---
+    const Validate = {
+      obraNombre(nombre, excludeId=null){
+        if(!nombre?.trim()) return 'El nombre es obligatorio';
+        const dup = state.obras.some(o => o.id !== excludeId && o.nombre.trim().toLowerCase() === nombre.trim().toLowerCase());
+        return dup ? 'Ya existe una obra con este nombre' : '';
+      },
+      item(data, obraId, excludeId=null){
+        const errors = {};
+        if(!data.nombre?.trim()) errors.nombre = 'El nombre es obligatorio';
+        const dup = state.items.some(it => it.id !== excludeId && it.obraId===obraId &&
+          it.nombre.trim().toLowerCase() === data.nombre.trim().toLowerCase() &&
+          it.categoria === data.categoria && (it.subtipo||'') === (data.subtipo||'') && (it.marca||'') === (data.marca||''));
+        if(!errors.nombre && dup) errors.nombre = 'Ya existe un ítem igual (nombre/categoría/subtipo/marca)';
+        if(!data.categoria) errors.categoria = 'La categoría es obligatoria';
+        if(data.categoria==='herramienta' && !data.subtipo) errors.subtipo = 'El subtipo es obligatorio para herramientas';
+        const cantidad = Number.parseInt(data.cantidad??'0',10);
+        if(Number.isNaN(cantidad) || cantidad < 0) errors.cantidad = 'Cantidad debe ser ≥ 0';
+        if(!data.marca?.trim()) errors.marca = 'La marca es obligatoria';
+        return errors;
+      }
+    };
+
+    // --- UI render ---
+    function renderObrasSelect(){
+      const sel = qs('#obraSelect');
+      const prev = sel.value;
+      sel.innerHTML = `<option value="">— Seleccionar Obra —</option>` + state.obras.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+      sel.value = state.selectedObraId || prev || '';
+      qs('#deleteObraBtn').disabled = !sel.value;
+      qs('#editObraBtn').disabled = !sel.value;
+    }
+
+    function renderBrandsSelect(){
+      const select = qs('#itemMarca');
+      const opts = [...BRANDS].sort((a,b)=>a.localeCompare(b));
+      select.innerHTML = opts.map(b=>`<option value="${b}">${b}</option>`).join('') + `<option value="__new__">Añadir nueva…</option>`;
+      // No seleccionar por defecto (preferible obligar)
+      select.insertAdjacentHTML('afterbegin', `<option value="">— Seleccionar —</option>`);
+      select.value = '';
+    }
+
+    function renderCounts(filtered){
+      qs('#totalCount').textContent = state.items.filter(i => i.obraId === state.selectedObraId).length;
+      qs('#visibleCount').textContent = filtered.length;
+    }
+
+    function applyFilters(){
+      const {categoria, subtipo, search} = state.filters;
+      return state.items.filter(i => i.obraId === state.selectedObraId)
+        .filter(i => !categoria || i.categoria === categoria)
+        .filter(i => categoria!=='herramienta' || !subtipo || (i.subtipo||'') === subtipo)
+        .filter(i => !search || i.nombre.toLowerCase().includes(search.toLowerCase()));
+    }
+
+    function renderTable(){
+      const tbody = qs('#tableBody');
+      if(!state.selectedObraId){
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px">Selecciona una obra para ver el inventario</td></tr>`;
+        renderCounts([]);
+        return;
+      }
+      const filtered = applyFilters();
+      if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px">Sin resultados</td></tr>`;
+        renderCounts(filtered);
+        return;
+      }
+      tbody.innerHTML = filtered.map(it=>`
+        <tr data-id="${it.id}">
+          <td>${it.nombre}</td>
+          <td>${cap(it.categoria)}</td>
+          <td>${it.categoria==='herramienta' ? (it.subtipo || '—') : '—'}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn-icon" data-action="dec" title="Disminuir">−</button>
+              <strong>${it.cantidad}</strong>
+              <button class="btn-icon" data-action="inc" title="Aumentar">+</button>
+            </div>
+          </td>
+          <td>${it.marca || '—'}</td>
+          <td>${it.ubicacion || '—'}</td>
+          <td>${it.observaciones || '—'}</td>
+          <td class="row-actions">
+            <button class="btn-secondary" data-action="edit">Editar</button>
+            <button class="btn-danger" data-action="delete">Eliminar</button>
+          </td>
+        </tr>
+      `).join('');
+      renderCounts(filtered);
+    }
+
+    // --- Obras ---
+    const obraModal = qs('#obraModal');
+    function openObraModal({mode='create', obra=null}={}){
+      qs('#obraModalTitle').textContent = mode==='edit' ? 'Editar Obra' : 'Nueva Obra';
+      const submit = qs('#obraSubmitBtn'); submit.textContent = mode==='edit' ? 'Guardar Cambios' : 'Crear Obra';
+      const del = qs('#obraDeleteBtn');
+      if(mode==='edit'){ show(del); del.onclick = () => { if(confirm('¿Eliminar esta obra y su inventario?')){ deleteObra(obra.id); closeObraModal(); } }; }
+      else { hide(del); del.onclick = null; }
+      const nameInput = qs('#obraNombre');
+      nameInput.value = obra?.nombre || '';
+      nameInput.dataset.mode = mode;
+      nameInput.dataset.id = obra?.id || '';
+      hide(qs('#obraNombre-error'));
+      obraModal.showModal();
+      setTimeout(()=>nameInput.focus(), 50);
+    }
+    function closeObraModal(){ obraModal.close(); }
+
+    function createObra(nombre){
+      const err = Validate.obraNombre(nombre);
+      if(err){ showError('#obraNombre-error', err); return null; }
+      const obra = { id: uid(), nombre: nombre.trim() };
+      state.obras.push(obra); state.selectedObraId = obra.id;
+      Storage.save(); renderObrasSelect(); renderTable();
+      toast('success', `Obra «${obra.nombre}» creada`);
+      return obra;
+    }
+    function updateObra(id, nombre){
+      const err = Validate.obraNombre(nombre, id);
+      if(err){ showError('#obraNombre-error', err); return null; }
+      const obra = state.obras.find(o=>o.id===id); if(!obra) return null;
+      obra.nombre = nombre.trim();
+      Storage.save(); renderObrasSelect();
+      toast('success', 'Obra actualizada');
+      return obra;
+    }
+    function deleteObra(id){
+      const obra = state.obras.find(o=>o.id===id);
+      state.obras = state.obras.filter(o=>o.id!==id);
+      state.items = state.items.filter(i=>i.obraId!==id);
+      if(state.selectedObraId===id) state.selectedObraId='';
+      Storage.save(); renderObrasSelect(); renderTable();
+      toast('success', `Obra «${obra?.nombre||''}» eliminada`);
+    }
+
+    // --- Ítems ---
+    function readItemForm(){
+      const cat = qs('#itemCategoria').value;
+      const selectMarca = qs('#itemMarca').value;
+      const nueva = qs('#itemMarcaNueva').value.trim();
+      const marca = (selectMarca === '__new__') ? nueva : selectMarca;
+      return {
+        nombre: qs('#itemNombre').value,
+        categoria: cat,
+        subtipo: cat==='herramienta' ? qs('#itemSubtipo').value : '',
+        cantidad: qs('#itemCantidad') ? qs('#itemCantidad').value : (0), // fallback si tuvieras un input distinto
+        marca,
+        ubicacion: qs('#itemUbicacion').value,
+        observaciones: qs('#itemObservaciones').value
+      };
+    }
+    function resetItemForm(){
+      qs('#itemForm').reset();
+      state.editingItemId = null;
+      qs('#submitBtn').textContent = 'Agregar Ítem';
+      qs('#formTitle').textContent = 'Agregar Ítem';
+      hideErrors();
+      // Reset marca select
+      renderBrandsSelect();
+      hide(qs('#marcaNuevaWrap'));
+    }
+    function showError(sel, msg){ const el = qs(sel); el.textContent = msg; show(el); }
+    function hideErrors(){ qsa('.alert.error').forEach(hide); }
+
+    function saveNewItem(){
+      const data = readItemForm();
+      const errors = Validate.item(data, state.selectedObraId);
+      hideErrors();
+      if(Object.keys(errors).length){
+        if(errors.nombre) showError('#itemNombre-error', errors.nombre);
+        if(errors.categoria) showError('#itemCategoria-error', errors.categoria);
+        if(errors.subtipo) showError('#itemSubtipo-error', errors.subtipo);
+        if(errors.marca) showError('#itemMarca-error', errors.marca);
+        toast('error', 'Revisa los campos obligatorios');
+        return;
+      }
+      if(qs('#itemMarca').value==='__new__' && data.marca){
+        BRANDS.add(data.marca); // Por qué: persistir opciones nuevas en sesión.
+      }
+      const item = {
+        id: uid(), obraId: state.selectedObraId, nombre: data.nombre.trim(),
+        categoria: data.categoria, subtipo: data.categoria==='herramienta'?data.subtipo:'',
+        cantidad: parseInt(qs('#itemCantidad')?.value || '0',10) || 0,
+        marca: data.marca.trim(),
+        ubicacion: data.ubicacion?.trim()||'', observaciones: data.observaciones?.trim()||''
+      };
+      state.items.push(item);
+      Storage.save(); renderTable(); resetItemForm(); toast('success','Ítem agregado');
+    }
+
+    function saveEditedItem(){
+      const data = readItemForm();
+      const errors = Validate.item(data, state.selectedObraId, state.editingItemId);
+      hideErrors();
+      if(Object.keys(errors).length){
+        if(errors.nombre) showError('#itemNombre-error', errors.nombre);
+        if(errors.categoria) showError('#itemCategoria-error', errors.categoria);
+        if(errors.subtipo) showError('#itemSubtipo-error', errors.subtipo);
+        if(errors.marca) showError('#itemMarca-error', errors.marca);
+        toast('error', 'Revisa los campos obligatorios');
+        return;
+      }
+      if(qs('#itemMarca').value==='__new__' && data.marca){
+        BRANDS.add(data.marca);
+      }
+      const it = state.items.find(i=>i.id===state.editingItemId);
+      if(!it) return;
+      it.nombre = data.nombre.trim();
+      it.categoria = data.categoria;
+      it.subtipo = data.categoria==='herramienta' ? data.subtipo : '';
+      it.marca = data.marca.trim();
+      it.ubicacion = data.ubicacion?.trim()||'';
+      it.observaciones = data.observaciones?.trim()||'';
+      Storage.save(); renderTable(); resetItemForm(); toast('success','Ítem actualizado');
+    }
+
+    // --- Cantidades (añadimos input numérico oculto para compatibilidad simple) ---
+    // Por simplicidad seguimos usando +/- y almacenamos en el objeto; no se edita en el formulario salvo que se desee.
+
+    // --- Notificaciones ---
+    function toast(type, msg){
+      const container = qs('#alertContainer');
+      container.innerHTML = `<div class="alert ${type==='error'?'error':'success'}">${msg}</div>`;
+      setTimeout(()=>{ container.innerHTML=''; }, 1600);
+    }
+
+    // --- Listeners ---
+    function addEventListeners(){
+      // Nueva obra / editar / eliminar (top)
+      qs('#nuevaObraBtn').addEventListener('click', ()=> openObraModal());
+      qs('#editObraBtn').addEventListener('click', ()=>{
+        const id = qs('#obraSelect').value; if(!id) return;
+        const obra = state.obras.find(o=>o.id===id); openObraModal({mode:'edit', obra});
+      });
+      qs('#deleteObraBtn').addEventListener('click', ()=>{
+        const id = qs('#obraSelect').value; if(!id) return;
+        if(confirm('¿Eliminar esta obra y todo su inventario?')) deleteObra(id);
+      });
+
+      // Modal
+      obraModal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeObraModal(); });
+      obraModal.addEventListener('cancel', (e)=>{ e.preventDefault(); closeObraModal(); });
+
+      // Form obra
+      qs('#obraForm').addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const mode = qs('#obraNombre').dataset.mode || 'create';
+        const id = qs('#obraNombre').dataset.id || '';
+        const nombre = qs('#obraNombre').value;
+        if(mode==='edit'){ updateObra(id, nombre) && closeObraModal(); }
+        else { createObra(nombre) && closeObraModal(); }
+      });
+
+      // Selector de obras
+      qs('#obraSelect').addEventListener('change', (e)=>{
+        state.selectedObraId = e.target.value;
+        Storage.save(); renderObrasSelect(); renderTable();
+      });
+
+      // Import/Export
+      qs('#exportBtn').addEventListener('click', ()=> Storage.export());
+      qs('#importFile').addEventListener('change', async (e)=>{
+        if(!e.target.files?.length) return;
+        try{
+          await Storage.import(e.target.files[0]);
+          renderObrasSelect(); renderBrandsSelect(); renderTable();
+          toast('success','Datos importados');
+        }catch(err){ toast('error', err.message || 'Error al importar'); }
+        e.target.value='';
+      });
+
+      // Form ítems
+      qs('#itemCategoria').addEventListener('change', (e)=>{
+        const cat = e.target.value;
+        qs('#subtipoGroup').style.display = (cat==='herramienta') ? 'block' : 'none';
+      });
+
+      // Marca select: mostrar input si "Añadir nueva…"
+      qs('#itemMarca').addEventListener('change', (e)=>{
+        if(e.target.value === '__new__'){ show(qs('#marcaNuevaWrap')); qs('#itemMarcaNueva').focus(); }
+        else { hide(qs('#marcaNuevaWrap')); }
+      });
+
+      qs('#itemForm').addEventListener('submit', (e)=>{
+        e.preventDefault();
+        if(!state.selectedObraId){ toast('error','Selecciona una obra primero'); return; }
+        if(state.editingItemId) saveEditedItem(); else saveNewItem();
+      });
+      qs('#cancelBtn').addEventListener('click', resetItemForm);
+
+      // Filtros
+      qsa('input[name="categoria"]').forEach(r=>r.addEventListener('change',(e)=>{
+        state.filters.categoria = e.target.value; renderTable();
+        qs('#subtipoFilter').style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
+      }));
+      qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{
+        state.filters.subtipo = e.target.value; renderTable();
+      }));
+      qs('#searchInput').addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
+
+      // Tabla (acciones)
+      qs('#tableBody').addEventListener('click', (e)=>{
+        const btn = e.target.closest('button'); if(!btn) return;
+        const tr = e.target.closest('tr'); const id = tr?.dataset.id; if(!id) return;
+        const action = btn.dataset.action;
+        const item = state.items.find(i=>i.id===id);
+        if(action==='inc'){ item.cantidad = (item.cantidad||0) + 1; Storage.save(); renderTable(); }
+        if(action==='dec'){ item.cantidad = Math.max(0, (item.cantidad||0) - 1); Storage.save(); renderTable(); }
+        if(action==='delete'){
+          if(confirm('¿Eliminar ítem?')){ state.items = state.items.filter(i=>i.id!==id); Storage.save(); renderTable(); }
+        }
+        if(action==='edit'){
+          state.editingItemId = id;
+          qs('#formTitle').textContent = 'Editar Ítem';
+          qs('#submitBtn').textContent = 'Guardar Cambios';
+          qs('#itemNombre').value = item.nombre;
+          qs('#itemCategoria').value = item.categoria;
+          qs('#subtipoGroup').style.display = (item.categoria==='herramienta') ? 'block' : 'none';
+          qs('#itemSubtipo').value = item.subtipo || '';
+          // Marca: set select o abrir input si no existe
+          renderBrandsSelect();
+          if(BRANDS.has(item.marca)){
+            qs('#itemMarca').value = item.marca;
+            hide(qs('#marcaNuevaWrap'));
+          }else if(item.marca){
+            qs('#itemMarca').value = '__new__';
+            show(qs('#marcaNuevaWrap'));
+            qs('#itemMarcaNueva').value = item.marca;
+          }else{
+            qs('#itemMarca').value = '';
+            hide(qs('#marcaNuevaWrap'));
+          }
+          qs('#itemUbicacion').value = item.ubicacion || '';
+          qs('#itemObservaciones').value = item.observaciones || '';
+          window.scrollTo({top:0, behavior:'smooth'});
+        }
+      });
+    }
+
+    // --- Init ---
+    function init(){
+      const data = Storage.load();
+      state.obras = data.obras; state.items = data.items;
+      // Asegurar marcas por defecto presentes
+      state.items.forEach(it=>{ if(it.marca) BRANDS.add(it.marca); });
+      renderObrasSelect();
+      renderBrandsSelect();
+      renderTable();
+      // Visibilidad subtipo seg. filtro inicial
+      qs('#subtipoFilter').style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
+      // Subtipo en formulario oculto por defecto
+      qs('#subtipoGroup').style.display = 'none';
+      addEventListeners();
+    }
+    init();
+  </script>
+</body>
+</html>
