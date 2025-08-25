@@ -79,12 +79,19 @@ function migrate(data){
 // =========================
 // Capa API (fetch a Netlify Functions)
 // =========================
-async function api(path, {method='GET', json}={}){
-  const opts = { method, headers:{} };
-  if(json!==undefined){ opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(json); }
-  const res = await fetch(`${CONFIG.apiBase}${path}`);
-  if(method!=='GET') return res.ok ? (res.status===204?null:res.json()) : Promise.reject(await res.json().catch(()=>({error:'API error'})));
-  return res.ok ? res.json() : Promise.reject(await res.json().catch(()=>({error:'API error'})));
+async function api(path, { method = 'GET', json } = {}) {
+  const opts = { method, headers: {} };
+  if (json !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(json);
+  }
+  // BUG FIX: antes no pasábamos 'opts' a fetch → siempre hacía GET sin body
+  const res = await fetch(`${CONFIG.apiBase}${path}`, opts);
+  if (res.status === 204) return null;
+  const text = await res.text();
+  let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!res.ok) throw new Error((data && (data.error || data.message)) || 'API error');
+  return data;
 }
 
 const API = {
