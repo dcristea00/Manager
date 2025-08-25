@@ -5,7 +5,7 @@ export async function handler(event) {
   try {
     const qs = event.queryStringParameters || {};
     const id = qs.id || null;
-    const obraId = qs.obraId || null;
+    const obraId = qs.obraId || qs.obra_id || null;
 
     if (event.httpMethod === 'GET') {
       if (id) {
