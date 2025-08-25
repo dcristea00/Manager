@@ -1,0 +1,172 @@
+<!-- File: /inventory/index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventario de Obras</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header>
+    <div class="header-bar">
+      <div class="title">Inventario de Obras</div>
+      <div class="header-controls">
+        <div class="row">
+          <select id="obraSelect" aria-label="Seleccionar obra">
+            <option value="">— Seleccionar Obra —</option>
+          </select>
+          <button type="button" id="editObraBtn" class="btn-secondary" title="Editar obra">✎</button>
+          <button type="button" id="deleteObraBtn" class="btn-danger btn-icon" title="Eliminar obra">🗑️</button>
+        </div>
+        <button type="button" id="nuevaObraBtn" class="btn-primary">Nueva Obra</button>
+        <div class="row">
+          <button type="button" id="exportBtn" class="btn-secondary">Exportar JSON</button>
+          <label for="importFile" class="btn-secondary" role="button" aria-controls="importFile">Importar JSON</label>
+          <input type="file" id="importFile" class="hidden" accept=".json" />
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel" aria-labelledby="como-usar">
+      <h2 id="como-usar">Cómo usar</h2>
+      <ol class="muted">
+        <li>“Nueva Obra”, luego selecciónala arriba.</li>
+        <li>Rellena el formulario y agrega ítems.</li>
+        <li>Filtra/busca y ajusta cantidades con +/-.</li>
+        <li>Exporta/Importa tus datos (JSON).</li>
+      </ol>
+      <p class="muted">Los datos se guardan en este navegador (<code>localStorage</code>).</p>
+    </section>
+
+    <!-- Filtros -->
+    <section class="panel" aria-labelledby="filtros">
+      <h2 id="filtros">Filtros</h2>
+      <div class="grid cols-3">
+        <div>
+          <label><b>Categoría</b></label>
+          <div class="row-actions" role="group" aria-label="Categoría">
+            <label><input type="radio" name="categoria" value="" checked> Todas</label>
+            <label><input type="radio" name="categoria" value="herramienta"> Herramientas</label>
+            <label><input type="radio" name="categoria" value="material"> Materiales</label>
+          </div>
+        </div>
+        <div id="subtipoFilter">
+          <label><b>Subtipo de Herramienta</b></label>
+          <div class="row-actions" role="group" aria-label="Subtipo">
+            <label><input type="radio" name="subtipo" value="" checked> Todos</label>
+            <label><input type="radio" name="subtipo" value="electrica"> Eléctrica</label>
+            <label><input type="radio" name="subtipo" value="manual"> Manual</label>
+          </div>
+        </div>
+        <div>
+          <label for="searchInput"><b>Buscar por nombre</b></label>
+          <input type="text" id="searchInput" placeholder="Escribe para buscar..." />
+        </div>
+      </div>
+    </section>
+
+    <!-- Formulario Ítems -->
+    <section class="panel" aria-labelledby="formTitle">
+      <h2 id="formTitle">Agregar Ítem</h2>
+      <div id="alertContainer" aria-live="polite"></div>
+      <form id="itemForm" novalidate>
+        <div class="grid cols-3">
+          <div>
+            <label for="itemNombre"><b>Nombre *</b></label>
+            <input id="itemNombre" required />
+            <div id="itemNombre-error" class="alert error hidden"></div>
+          </div>
+          <div>
+            <label for="itemCategoria"><b>Categoría *</b></label>
+            <select id="itemCategoria" required>
+              <option value="">— Seleccionar —</option>
+              <option value="herramienta">Herramienta</option>
+              <option value="material">Material</option>
+            </select>
+            <div id="itemCategoria-error" class="alert error hidden"></div>
+          </div>
+          <div id="subtipoGroup">
+            <label for="itemSubtipo"><b>Subtipo</b></label>
+            <select id="itemSubtipo">
+              <option value="">— Seleccionar —</option>
+              <option value="electrica">Eléctrica</option>
+              <option value="manual">Manual</option>
+            </select>
+            <div id="itemSubtipo-error" class="alert error hidden"></div>
+          </div>
+
+          <div>
+            <label for="itemMarca"><b>Marca *</b></label>
+            <select id="itemMarca" required></select>
+            <div id="itemMarca-error" class="alert error hidden"></div>
+          </div>
+          <div id="marcaNuevaWrap" class="hidden">
+            <label for="itemMarcaNueva"><b>Nueva marca</b></label>
+            <input id="itemMarcaNueva" placeholder="Introduce la marca y guarda" />
+          </div>
+
+          <div>
+            <label for="itemUbicacion"><b>Ubicación</b></label>
+            <input id="itemUbicacion" placeholder="ej: Almacén 1 / Estante A" />
+          </div>
+          <div style="grid-column:1/-1">
+            <label for="itemObservaciones"><b>Observaciones</b></label>
+            <textarea id="itemObservaciones" rows="3" placeholder="Notas adicionales..."></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="submitBtn" class="btn-dark">Agregar Ítem</button>
+          <button type="button" id="cancelBtn" class="btn-secondary">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tabla Inventario -->
+    <section class="panel" aria-labelledby="inventario">
+      <h2 id="inventario">Inventario</h2>
+      <div class="counters">
+        <div class="chip">Ítems visibles: <strong id="visibleCount">0</strong></div>
+        <div class="chip">Total: <strong id="totalCount">0</strong></div>
+      </div>
+      <div class="table-wrap" role="region" aria-label="Tabla de inventario">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Categoría</th><th>Subtipo</th>
+              <th>Cantidad</th><th>Marca</th><th>Ubicación</th>
+              <th>Observaciones</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" style="text-align:center;padding:20px">Selecciona una obra para ver el inventario</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Obras -->
+  <dialog id="obraModal" aria-labelledby="obraModalTitle">
+    <div class="modal-header">
+      <h3 id="obraModalTitle">Nueva Obra</h3>
+      <button type="button" class="btn-icon" aria-label="Cerrar" data-close>✕</button>
+    </div>
+    <div class="modal-content">
+      <form id="obraForm" novalidate>
+        <label for="obraNombre"><b>Nombre de la Obra *</b></label>
+        <input id="obraNombre" required />
+        <div id="obraNombre-error" class="alert error hidden"></div>
+        <div class="form-actions">
+          <button type="submit" id="obraSubmitBtn" class="btn-dark">Crear Obra</button>
+          <button type="button" id="obraCancelBtn" class="btn-secondary" data-close>Cancelar</button>
+          <button type="button" id="obraDeleteBtn" class="btn-danger hidden">Eliminar Obra</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</body>
+</html>

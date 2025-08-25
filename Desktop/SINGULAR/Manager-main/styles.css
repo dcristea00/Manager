@@ -1,0 +1,99 @@
+:root{
+      --ink:#0b1220;            /* azul casi negro */
+      --bg:#f7f8fb;
+      --primary:#0d2a4a;        /* azul oscuro */
+      --primary-ink:#ffffff;
+      --accent:#6b7a99;         /* gris azulado */
+      --danger:#c0362c;
+      --ok:#2f7d31;
+      --bw:3px;
+      --pad:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font:16px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+
+    /* Header - móvil primero */
+    header{
+      background:var(--primary);
+      color:var(--primary-ink);
+      border-bottom:var(--bw) solid #000;
+      padding:16px;
+      position:sticky; top:0; z-index:10;
+      box-shadow:8px 8px 0 #00000022;
+    }
+    .header-bar{display:grid; gap:10px}
+    .title{font-weight:800; font-size:20px; letter-spacing:.3px}
+    .header-controls{
+      display:grid; gap:8px;
+      grid-template-columns: 1fr 1fr;
+    }
+    .header-controls .row{
+      display:grid; gap:8px; grid-template-columns: 1fr auto auto;
+    }
+
+    /* Controles base */
+    select, input[type="text"], input[type="number"], textarea{
+      border:var(--bw) solid #000; background:#fff; padding:10px; min-height:44px; width:100%;
+    }
+    button{
+      border:var(--bw) solid #000; background:#fff; color:#000; padding:10px 14px; min-height:44px; cursor:pointer;
+      box-shadow:4px 4px 0 #000; transition:transform .02s;
+    }
+    button:active{transform:translate(2px,2px); box-shadow:2px 2px 0 #000}
+    .btn-primary{background:var(--accent); color:#000}
+    .btn-secondary{background:#e9edf3}
+    .btn-danger{background:var(--danger); color:#fff}
+    .btn-dark{background:#111; color:#fff}
+    .btn-icon{width:44px; height:44px; display:grid; place-items:center; padding:0}
+
+    /* Layout principal */
+    .container{max-width:1100px; margin:18px auto; padding:0 12px; display:grid; gap:16px}
+    .panel{border:var(--bw) solid #000; background:#fff; padding:16px; box-shadow:8px 8px 0 #0000001a}
+    .panel h2{margin:0 0 10px; font-size:18px}
+
+    /* Grids responsivos */
+    .grid{display:grid; gap:10px}
+    .cols-2{grid-template-columns:1fr}
+    .cols-3{grid-template-columns:1fr}
+    @media (min-width:800px){
+      .header-bar{grid-template-columns:auto 1fr}
+      .header-controls{grid-template-columns: 1fr auto auto}
+      .cols-2{grid-template-columns:repeat(2,1fr)}
+      .cols-3{grid-template-columns:repeat(3,1fr)}
+    }
+
+    /* Tabla */
+    .table-wrap{overflow:auto; border:var(--bw) solid #000; background:#fff}
+    table{width:100%; border-collapse:collapse}
+    th,td{border-bottom:var(--bw) solid #000; padding:10px; vertical-align:top}
+    thead th{background:#f1f4f9; position:sticky; top:0}
+    tr:hover td{background:#f9fbff}
+    .row-actions{display:flex; gap:6px; flex-wrap:wrap}
+
+    /* Form */
+    .form-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    label b{display:block; margin-bottom:4px}
+    .muted{color:#6b7280; font-size:14px}
+
+    /* Chips / contadores */
+    .counters{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{border:var(--bw) solid #000; background:#fff; padding:6px 10px}
+
+    /* Alertas */
+    .alert{border:var(--bw) solid #000; padding:10px; margin:10px 0}
+    .alert.success{background:#e6f6e6}
+    .alert.error{background:#ffe9e9}
+
+    /* Modal */
+    dialog{border:var(--bw) solid #000; padding:0; max-width:560px; width:92vw}
+    dialog::backdrop{background:#00000080}
+    .modal-header{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#0f1b31; color:#fff}
+    .modal-content{padding:14px}
+
+    /* Accesibilidad */
+    :focus-visible{outline:3px solid #000; outline-offset:2px}
+    .hidden{display:none!important}

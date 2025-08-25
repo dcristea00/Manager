@@ -1,0 +1,177 @@
+<!-- /index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inventario de Obras</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav__bar container">
+      <h1 class="nav__title">Inventario de Obras</h1>
+      <div class="actions actions--compact">
+        <div class="actions__row">
+          <button type="button" id="toggleHowToBtn" class="btn btn--ghost" aria-controls="howTo" aria-expanded="false">Cómo usar</button>
+          <button type="button" id="nuevaObraBtn" class="btn btn--primary">Nueva Obra</button>
+        </div>
+        <div class="actions__row">
+          <button type="button" id="exportBtn" class="btn">Exportar JSON</button>
+          <label for="importFile" class="btn btn--ghost" role="button" aria-controls="importFile">Importar JSON</label>
+          <input type="file" id="importFile" class="hidden" accept=".json" />
+        </div>
+      </div>
+
+      <div class="card card--toolbar">
+        <div class="grid grid--toolbar">
+          <div class="select-row">
+            <select id="obraSelect" aria-label="Seleccionar obra" class="field">
+              <option value="">— Seleccionar Obra —</option>
+            </select>
+            <button type="button" id="editObraBtn" class="iconbtn" title="Editar obra" aria-label="Editar obra">✎</button>
+            <button type="button" id="deleteObraBtn" class="iconbtn iconbtn--destructive" title="Eliminar obra" aria-label="Eliminar obra">🗑️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container stack">
+    <!-- AYUDA: oculta por defecto -->
+    <section id="howTo" class="card hidden" aria-labelledby="howToTitle">
+      <h2 id="howToTitle" class="card__title">Cómo usar</h2>
+      <ol class="muted">
+        <li>“Nueva Obra”, luego selecciónala arriba.</li>
+        <li>Rellena el formulario y agrega ítems.</li>
+        <li>Filtra/busca y ajusta cantidades con +/-.</li>
+        <li>Exporta/Importa tus datos (JSON).</li>
+      </ol>
+      <p class="muted">Los datos se guardan en este navegador (<code>localStorage</code>).</p>
+    </section>
+
+    <section class="card" aria-labelledby="filtros">
+      <h2 id="filtros" class="card__title">Filtros</h2>
+      <div class="grid grid--3">
+        <div>
+          <div class="label">Categoría</div>
+          <div class="segmented" role="group" aria-label="Categoría">
+            <label class="segmented__item"><input type="radio" name="categoria" value="" checked><span>Todas</span></label>
+            <label class="segmented__item"><input type="radio" name="categoria" value="herramienta"><span>Herramientas</span></label>
+            <label class="segmented__item"><input type="radio" name="categoria" value="material"><span>Materiales</span></label>
+          </div>
+        </div>
+        <div id="subtipoFilter">
+          <div class="label">Subtipo de Herramienta</div>
+          <div class="segmented" role="group" aria-label="Subtipo">
+            <label class="segmented__item"><input type="radio" name="subtipo" value="" checked><span>Todos</span></label>
+            <label class="segmented__item"><input type="radio" name="subtipo" value="electrica"><span>Eléctrica</span></label>
+            <label class="segmented__item"><input type="radio" name="subtipo" value="manual"><span>Manual</span></label>
+          </div>
+        </div>
+        <div>
+          <label for="searchInput" class="label">Buscar por nombre</label>
+          <input type="text" id="searchInput" class="field" placeholder="Escribe para buscar…" />
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="formTitle">
+      <h2 id="formTitle" class="card__title">Agregar Ítem</h2>
+      <div id="alertContainer" aria-live="polite"></div>
+      <form id="itemForm" class="stack" novalidate>
+        <div class="grid grid--3">
+          <div>
+            <label for="itemNombre" class="label">Nombre *</label>
+            <input id="itemNombre" class="field" required />
+            <div id="itemNombre-error" class="alert alert--error hidden"></div>
+          </div>
+          <div>
+            <label for="itemCategoria" class="label">Categoría *</label>
+            <select id="itemCategoria" class="field" required>
+              <option value="">— Seleccionar —</option>
+              <option value="herramienta">Herramienta</option>
+              <option value="material">Material</option>
+            </select>
+            <div id="itemCategoria-error" class="alert alert--error hidden"></div>
+          </div>
+          <div id="subtipoGroup">
+            <label for="itemSubtipo" class="label">Subtipo</label>
+            <select id="itemSubtipo" class="field">
+              <option value="">— Seleccionar —</option>
+              <option value="electrica">Eléctrica</option>
+              <option value="manual">Manual</option>
+            </select>
+            <div id="itemSubtipo-error" class="alert alert--error hidden"></div>
+          </div>
+
+          <div>
+            <label for="itemMarca" class="label">Marca *</label>
+            <select id="itemMarca" class="field" required></select>
+            <div id="itemMarca-error" class="alert alert--error hidden"></div>
+          </div>
+          <div id="marcaNuevaWrap" class="hidden">
+            <label for="itemMarcaNueva" class="label">Nueva marca</label>
+            <input id="itemMarcaNueva" class="field" placeholder="Introduce la marca y guarda" />
+          </div>
+
+          <div>
+            <label for="itemUbicacion" class="label">Ubicación</label>
+            <input id="itemUbicacion" class="field" placeholder="Almacén / Estante…" />
+          </div>
+          <div class="grid-col-span-all">
+            <label for="itemObservaciones" class="label">Observaciones</label>
+            <textarea id="itemObservaciones" class="field" rows="3" placeholder="Notas adicionales…"></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" id="submitBtn" class="btn btn--primary">Agregar Ítem</button>
+          <button type="button" id="cancelBtn" class="btn">Cancelar</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="inventario">
+      <h2 id="inventario" class="card__title">Inventario</h2>
+      <div class="chips">
+        <span class="chip">Ítems visibles: <strong id="visibleCount">0</strong></span>
+        <span class="chip">Total: <strong id="totalCount">0</strong></span>
+      </div>
+      <div class="table-wrap" role="region" aria-label="Tabla de inventario">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nombre</th><th>Categoría</th><th>Subtipo</th>
+              <th>Cantidad</th><th>Marca</th><th>Ubicación</th>
+              <th>Observaciones</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" class="table__empty">Selecciona una obra para ver el inventario</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="obraModal" class="modal" aria-labelledby="obraModalTitle">
+    <div class="modal__header">
+      <h3 id="obraModalTitle" class="modal__title">Nueva Obra</h3>
+      <button type="button" class="iconbtn" aria-label="Cerrar" data-close>✕</button>
+    </div>
+    <div class="modal__content">
+      <form id="obraForm" class="stack" novalidate>
+        <label for="obraNombre" class="label">Nombre de la Obra *</label>
+        <input id="obraNombre" class="field" required />
+        <div id="obraNombre-error" class="alert alert--error hidden"></div>
+        <div class="actions">
+          <button type="submit" id="obraSubmitBtn" class="btn btn--primary">Crear Obra</button>
+          <button type="button" id="obraCancelBtn" class="btn" data-close>Cancelar</button>
+          <button type="button" id="obraDeleteBtn" class="btn btn--danger hidden">Eliminar Obra</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</body>
+</html>
