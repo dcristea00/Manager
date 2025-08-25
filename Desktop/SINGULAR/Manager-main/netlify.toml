@@ -1,6 +1,6 @@
 [build]
-  command = ""
-  publish = "."
+  command = ""          # es un sitio estático
+  publish = "."         # carpeta del index.html
 
 [functions]
   directory = "netlify/functions"
@@ -12,3 +12,6 @@
 
 [functions."items"]
   included_files = ["netlify/functions/_db.js"]
+
+[build.environment]
+  NODE_VERSION = "20"
