@@ -106,62 +106,29 @@ const API = {
   itemDelete: (id) => api(`/items?id=${encodeURIComponent(id)}`, {method:'DELETE'})
 };
 
-// Normaliza filas del servidor (snake_case -> camelCase)
-function normalizeItem(row){
-  if (!row) return row;
-  return {
-    id: row.id,
-    obraId: row.obra_id,
-    nombre: row.nombre,
-    categoria: row.categoria,
-    subtipo: row.subtipo || '',
-    cantidad: Number.isFinite(row.cantidad) ? row.cantidad : (parseInt(row.cantidad,10) || 0),
-    marca: row.marca || '',
-    ubicacion: row.ubicacion || '',
-    observaciones: row.observaciones || ''
-  };
-}
-
 // =========================
 // Proveedor híbrido (elige online y cae a local)
 // =========================
 const DB = {
+  // WHY: Centralizamos aquí la decisión online/offline y mantenemos la UI intacta
   async listObras(){
     try { return await API.obrasList(); } catch { return Local.load().obras; }
   },
   async createObra(nombre){
-    try { return await API.obrasCreate(nombre); }
+    try { return await API.obrasCreate(nombre); } 
     catch { const o={id:uid(), nombre:nombre.trim()}; const d=Local.load(); d.obras.push(o); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return o; }
   },
   async updateObra(id, nombre){
-    try { return await API.obrasUpdate(id, nombre); }
+    try { return await API.obrasUpdate(id, nombre); } 
     catch { const d=Local.load(); const o=d.obras.find(x=>x.id===id); if(o){o.nombre=nombre.trim(); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d));} return o; }
   },
   async deleteObra(id){
-    try { await API.obrasDelete(id); }
+    try { await API.obrasDelete(id); } 
     catch { const d=Local.load(); d.obras = d.obras.filter(o=>o.id!==id); d.items = d.items.filter(i=>i.obraId!==id); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); }
   },
   async listItems(obraId){
-    try { const rows = await API.itemsList(obraId); return rows.map(normalizeItem); }
-    catch { return Local.load().items.filter(i=>i.obraId===obraId); }
+    try { return await API.itemsList(obraId); } catch { return Local.load().items.filter(i=>i.obraId===obraId); }
   },
-  async createItem(it){
-    try { return await API.itemCreate({
-      id: it.id, // por si lo generamos cliente
-      obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
-      cantidad: it.cantidad ?? 0, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
-    }); }
-    catch { const d=Local.load(); d.items.push(it); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
-  },
-  async updateItem(id, patch){
-    try { return await API.itemUpdate(id, patch); }
-    catch { const d=Local.load(); const it=d.items.find(x=>x.id===id); if(it) Object.assign(it, patch); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
-  },
-  async deleteItem(id){
-    try { await API.itemDelete(id); }
-    catch { const d=Local.load(); d.items = d.items.filter(i=>i.id!==id); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); }
-  }
-},
   async createItem(it){
     try { return await API.itemCreate({
       obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
@@ -483,8 +450,6 @@ function addEventListeners(){
 // Init
 // =========================
 async function init(){
-  // no-op replacement marker
-
   try{
     state.obras = await DB.listObras();
   }catch{
