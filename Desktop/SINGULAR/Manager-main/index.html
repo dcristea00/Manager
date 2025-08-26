@@ -8,7 +8,36 @@
   <link rel="stylesheet" href="styles.css" />
   <script defer src="app.js"></script>
 </head>
+<nav class="tabbar" aria-label="Navegación">
+  <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="tab">
+    <svg class="i"><use href="#i-home"/></svg><span>Inicio</span>
+  </a>
+  <a href="#inventario" class="tab">
+    <svg class="i"><use href="#i-list"/></svg><span>Inventario</span>
+  </a>
+  <a href="#howTo" class="tab">
+    <svg class="i"><use href="#i-info"/></svg><span>Ayuda</span>
+  </a>
+</nav>
+
 <body>
+  <!-- Sprite de iconos -->
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-3 2 1-2 1a7.9 7.9 0 0 1-.6 1.5l1.3 1.7-1.8 1.8-1.7-1.3A7.9 7.9 0 0 1 17 20l-1 2-2-2-2 2-1-2a7.9 7.9 0 0 1-1.5-.6l-1.7 1.3-1.8-1.8 1.3-1.7A7.9 7.9 0 0 1 4 14l-2-1 2-1c.1-.5.3-1 .6-1.5L3.3 8.8 5.1 7l1.7 1.3c.5-.3 1-.5 1.5-.6l1-2h4l1 2c.5.1 1 .3 1.5.6L18.9 7l1.8 1.8-1.3 1.7c.3.5.5 1 .6 1.5Z" fill-rule="evenodd"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Z"/><path d="M14.06 6.19 16.88 3.37 20.63 7.12 17.81 9.94z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0 1 12h8l1-12" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V7m0 0 4 4m-4-4-4 4M5 20h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 8v9m0 0 4-4m-4 4-4-4M5 20h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 8.5a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4ZM11 11h2v7h-2z"/><circle cx="12" cy="12" r="10" fill="none" stroke-width="1.5"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+    </defs>
+  </svg>
+
   <header>
     <div class="header-bar">
       <div class="title">Inventario de Obras</div>
@@ -22,11 +51,11 @@
         </div>
         <button type="button" id="nuevaObraBtn" class="btn-primary">Nueva Obra</button>
         <div class="row">
-          <button type="button"
-                  id="toggleHowToBtn"
-                  class="btn-secondary"
-                  aria-controls="howTo"
-                  aria-expanded="false">¿Cómo usar?</button>
+          <button type="button" id="toggleHowToBtn" class="btn-secondary" aria-controls="howTo" aria-expanded="false">
+            <svg class="i"><use href="#i-info"/></svg>
+            <span>¿Cómo usar?</span>
+          </button>
+          
           <button type="button" id="exportBtn" class="btn-secondary">Exportar JSON</button>
           <label for="importFile" class="btn-secondary" role="button" aria-controls="importFile">Importar JSON</label>
           <input type="file" id="importFile" class="hidden" accept=".json" />
@@ -38,15 +67,12 @@
   <main class="container">
     <section id="howTo" class="panel hidden" aria-labelledby="como-usar">
       <h2 id="como-usar" tabindex="-1">Cómo usar</h2>
-      <ol class="muted">
         <li>Crea una “Nueva Obra” y selecciónala.</li>
         <li>Agrega ítems desde el formulario.</li>
         <li>Usa filtros/búsqueda y ajusta cantidades.</li>
         <li>Exporta/Importa tus datos en JSON.</li>
-      </ol>
     </section>
-    
-
+        
     <!-- Filtros -->
     <section class="panel" aria-labelledby="filtros">
       <h2 id="filtros">Filtros</h2>
