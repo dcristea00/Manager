@@ -106,29 +106,62 @@ const API = {
   itemDelete: (id) => api(`/items?id=${encodeURIComponent(id)}`, {method:'DELETE'})
 };
 
+// Normaliza filas del servidor (snake_case -> camelCase)
+function normalizeItem(row){
+  if (!row) return row;
+  return {
+    id: row.id,
+    obraId: row.obra_id,
+    nombre: row.nombre,
+    categoria: row.categoria,
+    subtipo: row.subtipo || '',
+    cantidad: Number.isFinite(row.cantidad) ? row.cantidad : (parseInt(row.cantidad,10) || 0),
+    marca: row.marca || '',
+    ubicacion: row.ubicacion || '',
+    observaciones: row.observaciones || ''
+  };
+}
+
 // =========================
 // Proveedor híbrido (elige online y cae a local)
 // =========================
 const DB = {
-  // WHY: Centralizamos aquí la decisión online/offline y mantenemos la UI intacta
   async listObras(){
     try { return await API.obrasList(); } catch { return Local.load().obras; }
   },
   async createObra(nombre){
-    try { return await API.obrasCreate(nombre); } 
+    try { return await API.obrasCreate(nombre); }
     catch { const o={id:uid(), nombre:nombre.trim()}; const d=Local.load(); d.obras.push(o); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return o; }
   },
   async updateObra(id, nombre){
-    try { return await API.obrasUpdate(id, nombre); } 
+    try { return await API.obrasUpdate(id, nombre); }
     catch { const d=Local.load(); const o=d.obras.find(x=>x.id===id); if(o){o.nombre=nombre.trim(); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d));} return o; }
   },
   async deleteObra(id){
-    try { await API.obrasDelete(id); } 
+    try { await API.obrasDelete(id); }
     catch { const d=Local.load(); d.obras = d.obras.filter(o=>o.id!==id); d.items = d.items.filter(i=>i.obraId!==id); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); }
   },
   async listItems(obraId){
-    try { return await API.itemsList(obraId); } catch { return Local.load().items.filter(i=>i.obraId===obraId); }
+    try { const rows = await API.itemsList(obraId); return rows.map(normalizeItem); }
+    catch { return Local.load().items.filter(i=>i.obraId===obraId); }
   },
+  async createItem(it){
+    try { return await API.itemCreate({
+      id: it.id, // por si lo generamos cliente
+      obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
+      cantidad: it.cantidad ?? 0, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
+    }); }
+    catch { const d=Local.load(); d.items.push(it); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
+  },
+  async updateItem(id, patch){
+    try { return await API.itemUpdate(id, patch); }
+    catch { const d=Local.load(); const it=d.items.find(x=>x.id===id); if(it) Object.assign(it, patch); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
+  },
+  async deleteItem(id){
+    try { await API.itemDelete(id); }
+    catch { const d=Local.load(); d.items = d.items.filter(i=>i.id!==id); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); }
+  }
+},
   async createItem(it){
     try { return await API.itemCreate({
       obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
@@ -172,8 +205,13 @@ const Validate = {
 // =========================
 function renderObrasSelect(){
   const sel = qs('#obraSelect');
+  if(!sel) return; // safety
   const prev = sel.value;
-  sel.innerHTML = `<option value="">— Seleccionar Obra —</option>` + state.obras.map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+  sel.innerHTML = `<option value="">— Seleccionar Obra —</option>` + (state.obras||[]).map(o=>`<option value="${o.id}">${o.nombre}</option>`).join('');
+  sel.value = state.selectedObraId || prev || '';
+  const delBtn = qs('#obraDeleteBtn'); if (delBtn) delBtn.disabled = !sel.value;
+  const editBtn = qs('#editObraBtn'); if (editBtn) editBtn.disabled = !sel.value;
+}">${o.nombre}</option>`).join('');
   sel.value = state.selectedObraId || prev || '';
   qs('#deleteObraBtn').disabled = !sel.value;
   qs('#editObraBtn').disabled = !sel.value;
@@ -366,8 +404,89 @@ function setupHowToToggle(){
 
 function addEventListeners(){
   setupHowToToggle();
-  qs('#nuevaObraBtn').addEventListener('click', ()=> openObraModal());
-  qs('#editObraBtn').addEventListener('click', ()=>{ const id=qs('#obraSelect').value; if(!id) return; const obra=state.obras.find(o=>o.id===id); openObraModal({mode:'edit', obra}); });
+  const nuevaBtn = qs('#nuevaObraBtn'); if (nuevaBtn) nuevaBtn.addEventListener('click', ()=> openObraModal());
+  const editBtn = qs('#editObraBtn'); if (editBtn) editBtn.addEventListener('click', ()=>{ const id=qs('#obraSelect').value; if(!id) return; const obra=state.obras.find(o=>o.id===id); openObraModal({mode:'edit', obra}); });
+  const delHeaderBtn = qs('#obraDeleteBtn'); if (delHeaderBtn) delHeaderBtn.addEventListener('click', async ()=>{ const id=qs('#obraSelect').value; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id); });
+
+  // cerrar modal: botón X y Cancelar
+  qsa('.close-btn').forEach(b=>b.addEventListener('click', closeObraModal));
+  const obraCancel = qs('#obraCancelBtn'); if (obraCancel) obraCancel.addEventListener('click', closeObraModal);
+  const obraForm = qs('#obraForm'); if (obraForm) obraForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const mode = qs('#obraNombre').dataset.mode || 'create';
+    const id = qs('#obraNombre').dataset.id || '';
+    const nombre = qs('#obraNombre').value;
+    if(mode==='edit'){ await updateObra(id, nombre); closeObraModal(); }
+    else { await createObra(nombre); closeObraModal(); }
+  });
+
+  const obraSelect = qs('#obraSelect'); if (obraSelect) obraSelect.addEventListener('change', async (e)=>{
+    state.selectedObraId = e.target.value; renderObrasSelect();
+    state.items = state.selectedObraId ? await DB.listItems(state.selectedObraId) : [];
+    Local.save(); renderTable();
+  });
+
+  const exportBtn = qs('#exportBtn'); if (exportBtn) exportBtn.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify({version:CONFIG.version, obras:state.obras, items:state.items}, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `inventario-obras-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+  const importFile = qs('#importFile'); if (importFile) importFile.addEventListener('change', async (e)=>{
+    if(!e.target.files?.length) return;
+    try{
+      const txt = await e.target.files[0].text();
+      const data = migrate(JSON.parse(txt));
+      state.obras = data.obras; state.items = data.items; Local.save();
+      toast('success','Importado localmente');
+    }catch{ toast('error','Error al importar'); }
+    e.target.value='';
+  });
+
+  const catSel = qs('#itemCategoria'); if (catSel) catSel.addEventListener('change', (e)=>{ const stg=qs('#subtipoGroup'); if(stg) stg.style.display = (e.target.value==='herramienta') ? 'block' : 'none'; });
+  const marcaSel = qs('#itemMarca'); if (marcaSel) marcaSel.addEventListener('change', (e)=>{ const wrap=qs('#marcaNuevaWrap'); if(!wrap) return; if(e.target.value==='__new__'){ show(wrap); const i=qs('#itemMarcaNueva'); if(i) i.focus(); } else { hide(wrap); } });
+
+  const itemForm = qs('#itemForm'); if (itemForm) itemForm.addEventListener('submit', async (e)=>{
+    e.preventDefault(); if(!state.selectedObraId){ toast('error','Selecciona una obra primero'); return; }
+    if(state.editingItemId) await saveEditedItem(); else await saveNewItem();
+  });
+  const cancelBtn = qs('#cancelBtn'); if (cancelBtn) cancelBtn.addEventListener('click', resetItemForm);
+
+  qsa('input[name="categoria"]').forEach(r=>r.addEventListener('change',(e)=>{
+    state.filters.categoria = e.target.value; renderTable();
+    const stf = qs('#subtipoFilter'); if (stf) stf.style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
+  }));
+  qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{ state.filters.subtipo = e.target.value; renderTable(); }));
+  const search = qs('#searchInput'); if (search) search.addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
+
+  const tbody = qs('#tableBody'); if (tbody) tbody.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const tr = e.target.closest('tr'); const id = tr?.dataset.id; if(!id) return;
+    const action = btn.dataset.action; const item = state.items.find(i=>i.id===id);
+    if(!item) return;
+    if(action==='inc'){ item.cantidad = (item.cantidad||0) + 1; await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
+    if(action==='dec'){ item.cantidad = Math.max(0, (item.cantidad||0) - 1); await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
+    if(action==='delete'){ if(confirm('¿Eliminar ítem?')){ await DB.deleteItem(id); state.items = await DB.listItems(state.selectedObraId); renderTable(); } }
+    if(action==='edit'){
+      state.editingItemId = id;
+      qs('#formTitle').textContent = 'Editar Ítem';
+      qs('#submitBtn').textContent = 'Guardar Cambios';
+      qs('#itemNombre').value = item.nombre;
+      const ic = qs('#itemCategoria'); if (ic) ic.value = item.categoria;
+      const stg = qs('#subtipoGroup'); if (stg) stg.style.display = (item.categoria==='herramienta') ? 'block' : 'none';
+      const is = qs('#itemSubtipo'); if (is) is.value = item.subtipo || '';
+      renderBrandsSelect();
+      const ms = qs('#itemMarca'); const wrap = qs('#marcaNuevaWrap');
+      if (ms) {
+        if(BRANDS.has(item.marca)){ ms.value = item.marca; if(wrap) hide(wrap); }
+        else if(item.marca){ ms.value='__new__'; if(wrap) { show(wrap); const nm=qs('#itemMarcaNueva'); if(nm) nm.value=item.marca; } }
+        else { ms.value=''; if(wrap) hide(wrap); }
+      }
+      const iu = qs('#itemUbicacion'); if (iu) iu.value = item.ubicacion || '';
+      const io = qs('#itemObservaciones'); if (io) io.value = item.observaciones || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+  });
+}); });
   qs('#deleteObraBtn').addEventListener('click', async ()=>{ const id=qs('#obraSelect').value; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id); });
 
   obraModal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeObraModal(); });
@@ -450,16 +569,23 @@ function addEventListeners(){
 // Init
 // =========================
 async function init(){
-  try{
+  try {
     state.obras = await DB.listObras();
-  }catch{
+  } catch {
     const data = Local.load(); state.obras = data.obras; state.items = data.items;
   }
-  // sincroniza marcas del histórico
+  // Autocargar items si hay una obra seleccionada previamente
+  const sel = qs('#obraSelect');
+  state.selectedObraId = sel ? (sel.value || state.selectedObraId || (state.obras[0]?.id || '')) : (state.selectedObraId || state.obras[0]?.id || '');
+  if (state.selectedObraId) {
+    try { state.items = await DB.listItems(state.selectedObraId); } catch { /* offline */ }
+  }
+  // construir set de marcas desde items existentes
   state.items.forEach(it=>{ if(it.marca) BRANDS.add(it.marca); });
   renderObrasSelect(); renderBrandsSelect(); renderTable();
-  qs('#subtipoFilter').style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
-  qs('#subtipoGroup').style.display = 'none';
+  const stf = qs('#subtipoFilter'); if (stf) stf.style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
+  const stg = qs('#subtipoGroup'); if (stg) stg.style.display = 'none';
   addEventListeners();
 }
-init();
+
+document.addEventListener('DOMContentLoaded', init);
