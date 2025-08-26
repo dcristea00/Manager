@@ -222,3 +222,78 @@ html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
 #view-home { padding: 12px; }
 #view-home .grid { grid-template-columns: 1fr; }
 #view-home input, #view-home select, #view-home textarea { max-width: 100%; }
+
+/* ===== MODAL iOS-SAFE, BLANCO Y LEGIBLE ===== */
+dialog { border:0; padding:0; background:transparent; }
+dialog[open]{
+  position: fixed; inset: 0; z-index: 1000;   /* iOS Safari: asegura overlay */
+  display: flex; align-items: center; justify-content: center;
+}
+dialog::backdrop{ background: rgba(0,0,0,.55); }
+
+.dialog-card{
+  background:#ffffff !important;
+  color:#0f172a !important;
+  border:1px solid #dfe7f2 !important;
+  border-radius: 18px;
+  width: min(520px, 92vw);
+  max-height: 85vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;          /* título / contenido / acciones */
+  overflow: hidden;                            /* evita que el título “suba” */
+  box-shadow: 0 30px 80px rgba(0,0,0,.45);
+}
+
+.dialog-head{ display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid #e6eef8; background:#f7faff; }
+.dialog-head h3{ margin:0; font-size:18px; color:#0b2c4d; }
+
+.dialog-body{ padding:16px; overflow:auto; background:#fff; }
+.dialog-body label > span{ color:#0b2c4d; }
+
+.dialog-foot{ display:flex; align-items:center; gap:8px;
+  padding:14px 16px; border-top:1px solid #e6eef8; background:#f7faff; }
+.dialog-foot .spacer{ flex:1; }
+
+/* Inputs dentro del modal: blancos y de alto contraste */
+.dialog-card input{
+  background:#ffffff; color:#0f172a;
+  border:1px solid #cfe0f5; border-radius:12px;
+}
+.dialog-card .error{ color:#b91c1c; }
+
+/* ===== TABLA → CARDS en móvil ===== */
+@media (max-width: 520px){
+  #view-inventario thead{ display:none; }
+  #view-inventario table,
+  #view-inventario tbody,
+  #view-inventario tr,
+  #view-inventario td{ display:block; width:100%; }
+  #view-inventario tbody tr{
+    border:1px solid #2c5c80; border-radius:12px;
+    background: var(--panel); padding:10px; margin-bottom:10px;
+  }
+  #view-inventario td{
+    display:grid; grid-template-columns: 110px 1fr;
+    gap:6px; padding:6px 0; border:0;
+    white-space: normal; word-break: normal; overflow-wrap:anywhere;
+  }
+  /* Etiquetas (cabeceras) por columna */
+  #view-inventario td:nth-child(1)::before{ content:'Nombre'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(2)::before{ content:'Categoría'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(3)::before{ content:'Subtipo'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(4)::before{ content:'Cantidad'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(5)::before{ content:'Marca'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(6)::before{ content:'Ubicación'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(7)::before{ content:'Observaciones'; font-weight:600; color:#cfe0f5; }
+  #view-inventario td:nth-child(8)::before{ content:'Acciones'; font-weight:600; color:#cfe0f5; }
+
+  /* Acciones y +/- en una sola línea */
+  #view-inventario td:nth-child(4) strong{ margin: 0 8px; }
+  #view-inventario td:nth-child(8){ grid-template-columns: 110px auto; }
+  #view-inventario td:nth-child(8) .row-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  /* Un pelín más de aire en inventario */
+  #view-inventario h2{ letter-spacing:.2px }
+  #view-inventario th, #view-inventario td{ line-height:1.35 }
+
+}
