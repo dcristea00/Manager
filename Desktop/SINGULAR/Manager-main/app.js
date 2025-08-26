@@ -598,6 +598,48 @@ function addEventListeners() {
   });
 }
 
+/* ===== Router simple por hash: #home | #inventario | #ayuda | #datos ===== */
+(function setupRouter(){
+  const views = {
+    home: document.getElementById('view-home'),
+    inventario: document.getElementById('view-inventario'),
+    ayuda: document.getElementById('view-ayuda'),
+    datos: document.getElementById('view-datos'),
+  };
+  const tabs = {
+    home: document.getElementById('nav-home'),
+    inventario: document.getElementById('nav-inventario'),
+    ayuda: document.getElementById('nav-ayuda'),
+    datos: document.getElementById('nav-datos'),
+  };
+
+  function showView(name){
+    Object.values(views).forEach(v => v && v.classList.add('hidden'));
+    Object.values(tabs).forEach(t => t && t.classList.remove('active'));
+    (views[name]||views.home)?.classList.remove('hidden');
+    (tabs[name]||tabs.home)?.classList.add('active');
+  }
+
+  function applyRoute(){
+    const name = (location.hash.replace('#','') || 'home');
+    showView(name);
+  }
+
+  window.addEventListener('hashchange', applyRoute);
+  document.addEventListener('DOMContentLoaded', applyRoute);
+
+  // Ir a Inventario automáticamente al elegir obra en Home
+  const obraSelect = document.getElementById('obraSelect');
+  if (obraSelect) {
+    obraSelect.addEventListener('change', () => {
+      if (obraSelect.value && (location.hash === '' || location.hash === '#home')) {
+        location.hash = '#inventario';
+      }
+    });
+  }
+})();
+
+
 // =========================
 // Init
 // =========================
