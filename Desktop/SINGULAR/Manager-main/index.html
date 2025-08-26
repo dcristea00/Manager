@@ -22,25 +22,30 @@
         </div>
         <button type="button" id="nuevaObraBtn" class="btn-primary">Nueva Obra</button>
         <div class="row">
+          <button type="button"
+                  id="toggleHowToBtn"
+                  class="btn-secondary"
+                  aria-controls="howTo"
+                  aria-expanded="false">¿Cómo usar?</button>
           <button type="button" id="exportBtn" class="btn-secondary">Exportar JSON</button>
           <label for="importFile" class="btn-secondary" role="button" aria-controls="importFile">Importar JSON</label>
           <input type="file" id="importFile" class="hidden" accept=".json" />
-        </div>
+        </div>       
       </div>
     </div>
   </header>
 
   <main class="container">
-    <section class="panel" aria-labelledby="como-usar">
-      <h2 id="como-usar">Cómo usar</h2>
+    <section id="howTo" class="panel hidden" aria-labelledby="como-usar">
+      <h2 id="como-usar" tabindex="-1">Cómo usar</h2>
       <ol class="muted">
-        <li>“Nueva Obra”, luego selecciónala arriba.</li>
-        <li>Rellena el formulario y agrega ítems.</li>
-        <li>Filtra/busca y ajusta cantidades con +/-.</li>
-        <li>Exporta/Importa tus datos (JSON).</li>
+        <li>Crea una “Nueva Obra” y selecciónala.</li>
+        <li>Agrega ítems desde el formulario.</li>
+        <li>Usa filtros/búsqueda y ajusta cantidades.</li>
+        <li>Exporta/Importa tus datos en JSON.</li>
       </ol>
-      <p class="muted">Los datos se guardan en este navegador (<code>localStorage</code>).</p>
     </section>
+    
 
     <!-- Filtros -->
     <section class="panel" aria-labelledby="filtros">

@@ -370,22 +370,47 @@ async function saveEditedItem(){
 // =========================
 let __listenersBound = false; // evita doble binding global
 
+// Reemplaza tu setupHowToToggle() por esta versión
 function setupHowToToggle() {
   const btn = qs('#toggleHowToBtn');
   const panel = qs('#howTo');
   if (!btn || !panel) return;
 
-  if (!btn.hasAttribute('aria-expanded')) btn.setAttribute('aria-expanded', 'false');
+  // estado inicial según si el panel está oculto
+  btn.setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
 
-  // si ya existía un handler anterior, lo quitamos antes de registrar
+  // evita doble binding si la función se invoca de nuevo
   if (btn.__handler) btn.removeEventListener('click', btn.__handler);
+
   btn.__handler = () => {
-    const hidden = panel.classList.contains('hidden');
-    if (hidden) { show(panel); btn.setAttribute('aria-expanded', 'true'); }
-    else { hide(panel); btn.setAttribute('aria-expanded', 'false'); }
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+      panel.classList.remove('hidden');
+      btn.setAttribute('aria-expanded', 'true');
+      // enfoque accesible al abrir
+      const h = panel.querySelector('#como-usar');
+      if (h && typeof h.focus === 'function') setTimeout(() => h.focus(), 0);
+    } else {
+      panel.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+    }
   };
+
   btn.addEventListener('click', btn.__handler);
+
+  // (opcional) cerrar con ESC cuando está visible
+  if (!panel.__escHandler) {
+    panel.__escHandler = (e) => {
+      if (e.key === 'Escape' && !panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.focus();
+      }
+    };
+    document.addEventListener('keydown', panel.__escHandler);
+  }
 }
+
 
 function addEventListeners() {
   if (__listenersBound) return;      // ← clave: no registrar dos veces
