@@ -308,7 +308,7 @@ function readItemForm(){
     nombre: qs('#itemNombre').value,
     categoria: cat,
     subtipo: cat==='herramienta' ? qs('#itemSubtipo').value : '',
-    cantidad: 0,
+    cantidad: 1,
     marca,
     ubicacion: qs('#itemUbicacion').value,
     observaciones: qs('#itemObservaciones').value
@@ -336,7 +336,7 @@ async function saveNewItem(){
   if(qs('#itemMarca').value==='__new__' && data.marca){ BRANDS.add(data.marca); }
   const item = {
     id: uid(), obraId: state.selectedObraId, nombre: data.nombre.trim(), categoria: data.categoria,
-    subtipo: data.categoria==='herramienta' ? data.subtipo : '', cantidad: 0, marca: data.marca?.trim()||'',
+    subtipo: data.categoria==='herramienta' ? data.subtipo : '', cantidad: 1, marca: data.marca?.trim()||'',
     ubicacion: data.ubicacion?.trim()||'', observaciones: data.observaciones?.trim()||''
   };
   await DB.createItem(item);
@@ -365,96 +365,181 @@ async function saveEditedItem(){
   state.items = await DB.listItems(state.selectedObraId);
   Local.save(); renderTable(); resetItemForm(); toast('success','Ítem actualizado');
 }
+// =========================
+// Listeners (versión corregida e idempotente)
+// =========================
+let __listenersBound = false; // evita doble binding global
 
-// =========================
-// Listeners
-// =========================
-function setupHowToToggle(){
+function setupHowToToggle() {
   const btn = qs('#toggleHowToBtn');
   const panel = qs('#howTo');
-  if(!btn || !panel) return;
-  btn.setAttribute('aria-expanded','false');
-  btn.addEventListener('click', ()=>{
+  if (!btn || !panel) return;
+
+  if (!btn.hasAttribute('aria-expanded')) btn.setAttribute('aria-expanded', 'false');
+
+  // si ya existía un handler anterior, lo quitamos antes de registrar
+  if (btn.__handler) btn.removeEventListener('click', btn.__handler);
+  btn.__handler = () => {
     const hidden = panel.classList.contains('hidden');
-    if(hidden){ show(panel); btn.setAttribute('aria-expanded','true'); }
-    else { hide(panel); btn.setAttribute('aria-expanded','false'); }
-  });
+    if (hidden) { show(panel); btn.setAttribute('aria-expanded', 'true'); }
+    else { hide(panel); btn.setAttribute('aria-expanded', 'false'); }
+  };
+  btn.addEventListener('click', btn.__handler);
 }
 
-function addEventListeners(){
-  setupHowToToggle();
-  const nuevaBtn = qs('#nuevaObraBtn'); if (nuevaBtn) nuevaBtn.addEventListener('click', ()=> openObraModal());
-  const editBtn = qs('#editObraBtn'); if (editBtn) editBtn.addEventListener('click', ()=>{ const id=qs('#obraSelect').value; if(!id) return; const obra=state.obras.find(o=>o.id===id); openObraModal({mode:'edit', obra}); });
-  const delHeaderBtn = qs('#obraDeleteBtn'); if (delHeaderBtn) delHeaderBtn.addEventListener('click', async ()=>{ const id=qs('#obraSelect').value; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id); });
+function addEventListeners() {
+  if (__listenersBound) return;      // ← clave: no registrar dos veces
+  __listenersBound = true;
 
-  // cerrar modal: botón X y Cancelar
-  qsa('.close-btn').forEach(b=>b.addEventListener('click', closeObraModal));
-  const obraCancel = qs('#obraCancelBtn'); if (obraCancel) obraCancel.addEventListener('click', closeObraModal);
-  const obraForm = qs('#obraForm'); if (obraForm) obraForm.addEventListener('submit', async (e)=>{
+  setupHowToToggle();
+
+  // ---- Obras: botones header ----
+  const nuevaBtn = qs('#nuevaObraBtn');
+  if (nuevaBtn) nuevaBtn.addEventListener('click', () => openObraModal());
+
+  const editBtn = qs('#editObraBtn');
+  if (editBtn) editBtn.addEventListener('click', () => {
+    const id = qs('#obraSelect').value;
+    if (!id) return;
+    const obra = state.obras.find((o) => o.id === id);
+    openObraModal({ mode: 'edit', obra });
+  });
+
+  const delHeaderBtn = qs('#obraDeleteBtn');
+  if (delHeaderBtn) delHeaderBtn.addEventListener('click', async () => {
+    const id = qs('#obraSelect').value;
+    if (!id) return;
+    if (confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id);
+  });
+
+  // ---- Modal de obras ----
+  qsa('.close-btn').forEach((b) => b.addEventListener('click', closeObraModal));
+  const obraCancel = qs('#obraCancelBtn');
+  if (obraCancel) obraCancel.addEventListener('click', closeObraModal);
+
+  const obraForm = qs('#obraForm');
+  if (obraForm) obraForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const mode = qs('#obraNombre').dataset.mode || 'create';
-    const id = qs('#obraNombre').dataset.id || '';
-    const nombre = qs('#obraNombre').value;
-    if(mode==='edit'){ await updateObra(id, nombre); closeObraModal(); }
+    // soporte para dónde guardes el modo/id (input o form)
+    const nombreEl = qs('#obraNombre');
+    const mode = obraForm.dataset.mode || nombreEl?.dataset.mode || 'create';
+    const id = obraForm.dataset.id || nombreEl?.dataset.id || '';
+    const nombre = nombreEl.value;
+    if (mode === 'edit') { await updateObra(id, nombre); closeObraModal(); }
     else { await createObra(nombre); closeObraModal(); }
   });
 
-  const obraSelect = qs('#obraSelect'); if (obraSelect) obraSelect.addEventListener('change', async (e)=>{
-    state.selectedObraId = e.target.value; renderObrasSelect();
+  // ---- Select de Obras ----
+  const obraSelect = qs('#obraSelect');
+  if (obraSelect) obraSelect.addEventListener('change', async (e) => {
+    state.selectedObraId = e.target.value;
+    renderObrasSelect();
     state.items = state.selectedObraId ? await DB.listItems(state.selectedObraId) : [];
-    Local.save(); renderTable();
+    Local.save();
+    renderTable();
   });
 
-  const exportBtn = qs('#exportBtn'); if (exportBtn) exportBtn.addEventListener('click', ()=>{
-    const blob = new Blob([JSON.stringify({version:CONFIG.version, obras:state.obras, items:state.items}, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = `inventario-obras-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  // ---- Export / Import ----
+  const exportBtn = qs('#exportBtn');
+  if (exportBtn) exportBtn.addEventListener('click', () => {
+    const blob = new Blob(
+      [JSON.stringify({ version: CONFIG.version, obras: state.obras, items: state.items }, null, 2)],
+      { type: 'application/json' },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventario-obras-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   });
-  const importFile = qs('#importFile'); if (importFile) importFile.addEventListener('change', async (e)=>{
-    if(!e.target.files?.length) return;
-    try{
+
+  const importFile = qs('#importFile');
+  if (importFile) importFile.addEventListener('change', async (e) => {
+    if (!e.target.files?.length) return;
+    try {
       const txt = await e.target.files[0].text();
       const data = migrate(JSON.parse(txt));
-      state.obras = data.obras; state.items = data.items; Local.save();
-      toast('success','Importado localmente');
-    }catch{ toast('error','Error al importar'); }
-    e.target.value='';
+      state.obras = data.obras;
+      state.items = data.items;
+      Local.save();
+      toast('success', 'Importado localmente');
+    } catch {
+      toast('error', 'Error al importar');
+    }
+    e.target.value = '';
   });
 
-  const catSel = qs('#itemCategoria'); if (catSel) catSel.addEventListener('change', (e)=>{ const stg=qs('#subtipoGroup'); if(stg) stg.style.display = (e.target.value==='herramienta') ? 'block' : 'none'; });
-  const marcaSel = qs('#itemMarca'); if (marcaSel) marcaSel.addEventListener('change', (e)=>{ const wrap=qs('#marcaNuevaWrap'); if(!wrap) return; if(e.target.value==='__new__'){ show(wrap); const i=qs('#itemMarcaNueva'); if(i) i.focus(); } else { hide(wrap); } });
-
-  const itemForm = qs('#itemForm'); if (itemForm) itemForm.addEventListener('submit', async (e)=>{
-    e.preventDefault(); if(!state.selectedObraId){ toast('error','Selecciona una obra primero'); return; }
-    if(state.editingItemId) await saveEditedItem(); else await saveNewItem();
+  // ---- Form ítems ----
+  const catSel = qs('#itemCategoria');
+  if (catSel) catSel.addEventListener('change', (e) => {
+    const stg = qs('#subtipoGroup');
+    if (stg) stg.style.display = (e.target.value === 'herramienta') ? 'block' : 'none';
   });
-  const cancelBtn = qs('#cancelBtn'); if (cancelBtn) cancelBtn.addEventListener('click', resetItemForm);
 
-  qsa('input[name="categoria"]').forEach(r=>r.addEventListener('change',(e)=>{
-    state.filters.categoria = e.target.value; renderTable();
-    const stf = qs('#subtipoFilter'); if (stf) stf.style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
+  const marcaSel = qs('#itemMarca');
+  if (marcaSel) marcaSel.addEventListener('change', (e) => {
+    const wrap = qs('#marcaNuevaWrap');
+    if (!wrap) return;
+    if (e.target.value === '__new__') { show(wrap); const i = qs('#itemMarcaNueva'); if (i) i.focus(); }
+    else { hide(wrap); }
+  });
+
+  // ÚNICO listener de submit del formulario de ítems (evita doble POST)
+  const itemForm = qs('#itemForm');
+  if (itemForm) itemForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.selectedObraId) { toast('error', 'Selecciona una obra primero'); return; }
+    if (state.editingItemId) await saveEditedItem();
+    else await saveNewItem();
+  });
+
+  const cancelBtn = qs('#cancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', resetItemForm);
+
+  // ---- Filtros / búsqueda ----
+  qsa('input[name="categoria"]').forEach((r) => r.addEventListener('change', (e) => {
+    state.filters.categoria = e.target.value;
+    renderTable();
+    const stf = qs('#subtipoFilter');
+    if (stf) stf.style.display = (state.filters.categoria === 'herramienta') ? 'block' : 'none';
   }));
-  qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{ state.filters.subtipo = e.target.value; renderTable(); }));
-  const search = qs('#searchInput'); if (search) search.addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
 
-  qs('#tableBody').addEventListener('click', async (e) => {
+  qsa('input[name="subtipo"]').forEach((r) => r.addEventListener('change', (e) => {
+    state.filters.subtipo = e.target.value;
+    renderTable();
+  }));
+
+  const search = qs('#searchInput');
+  if (search) search.addEventListener('input', (e) => {
+    state.filters.search = e.target.value;
+    renderTable();
+  });
+
+  // ---- Tabla (delegación única para + / - / editar / eliminar) ----
+  const tbody = qs('#tableBody');
+  if (tbody) tbody.addEventListener('click', async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
+
     const tr = btn.closest('tr');
     const id = tr?.dataset.id;
     if (!id) return;
-  
+
     const action = btn.dataset.action;
-    const item = state.items.find(i => i.id === id);
+    const item = state.items.find((i) => i.id === id);
     if (!item) return;
-  
+
     if (action === 'inc' || action === 'dec') {
+      // evita negativos y doble suma (solo hay un listener)
       item.cantidad = Math.max(0, (item.cantidad || 0) + (action === 'inc' ? 1 : -1));
       await DB.updateItem(id, { cantidad: item.cantidad });
       renderTable();
       return;
     }
-  
+
     if (action === 'delete') {
       if (!confirm('¿Eliminar ítem?')) return;
       await DB.deleteItem(id);
@@ -462,78 +547,30 @@ function addEventListeners(){
       renderTable();
       return;
     }
+
     if (action === 'edit') {
       state.editingItemId = id;
       qs('#formTitle').textContent = 'Editar Ítem';
       qs('#submitBtn').textContent = 'Guardar Cambios';
       qs('#itemNombre').value = item.nombre;
+
       const ic = qs('#itemCategoria'); if (ic) ic.value = item.categoria;
-      const stg = qs('#subtipoGroup'); if (stg) stg.style.display = (item.categoria==='herramienta') ? 'block' : 'none';
+      const stg = qs('#subtipoGroup'); if (stg) stg.style.display = (item.categoria === 'herramienta') ? 'block' : 'none';
       const is = qs('#itemSubtipo'); if (is) is.value = item.subtipo || '';
+
       renderBrandsSelect();
       const ms = qs('#itemMarca'); const wrap = qs('#marcaNuevaWrap');
       if (ms) {
-        if(BRANDS.has(item.marca)){ ms.value = item.marca; if(wrap) hide(wrap); }
-        else if(item.marca){ ms.value='__new__'; if(wrap) { show(wrap); const nm=qs('#itemMarcaNueva'); if(nm) nm.value=item.marca; } }
-        else { ms.value=''; if(wrap) hide(wrap); }
+        if (BRANDS.has(item.marca)) { ms.value = item.marca; if (wrap) hide(wrap); }
+        else if (item.marca) { ms.value = '__new__'; if (wrap) { show(wrap); const nm = qs('#itemMarcaNueva'); if (nm) nm.value = item.marca; } }
+        else { ms.value = ''; if (wrap) hide(wrap); }
       }
+
       const iu = qs('#itemUbicacion'); if (iu) iu.value = item.ubicacion || '';
       const io = qs('#itemObservaciones'); if (io) io.value = item.observaciones || '';
-      window.scrollTo({top:0, behavior:'smooth'});
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   });
-
-  qs('#deleteObraBtn').addEventListener('click', async ()=>{ const id=qs('#obraSelect').value; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id); });
-
-  obraModal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeObraModal(); });
-  obraModal.addEventListener('cancel', (e)=>{ e.preventDefault(); closeObraModal(); });
-  qs('#obraForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const mode = qs('#obraNombre').dataset.mode || 'create';
-    const id = qs('#obraNombre').dataset.id || '';
-    const nombre = qs('#obraNombre').value;
-    if(mode==='edit'){ await updateObra(id, nombre); closeObraModal(); }
-    else { await createObra(nombre); closeObraModal(); }
-  });
-
-  qs('#obraSelect').addEventListener('change', async (e)=>{
-    state.selectedObraId = e.target.value; renderObrasSelect();
-    state.items = state.selectedObraId ? await DB.listItems(state.selectedObraId) : [];
-    Local.save(); renderTable();
-  });
-
-  qs('#exportBtn').addEventListener('click', ()=>{
-    const blob = new Blob([JSON.stringify({version:CONFIG.version, obras:state.obras, items:state.items}, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = `inventario-obras-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-  qs('#importFile').addEventListener('change', async (e)=>{
-    if(!e.target.files?.length) return;
-    try{
-      const txt = await e.target.files[0].text();
-      const data = migrate(JSON.parse(txt));
-      // subimos todo a la API si existe selección de obra después
-      state.obras = data.obras; state.items = data.items; Local.save();
-      toast('success','Importado localmente');
-    }catch{ toast('error','Error al importar'); }
-    e.target.value='';
-  });
-
-  qs('#itemCategoria').addEventListener('change', (e)=>{ qs('#subtipoGroup').style.display = (e.target.value==='herramienta') ? 'block' : 'none'; });
-  qs('#itemMarca').addEventListener('change', (e)=>{ if(e.target.value==='__new__'){ show(qs('#marcaNuevaWrap')); qs('#itemMarcaNueva').focus(); } else { hide(qs('#marcaNuevaWrap')); } });
-
-  qs('#itemForm').addEventListener('submit', async (e)=>{
-    e.preventDefault(); if(!state.selectedObraId){ toast('error','Selecciona una obra primero'); return; }
-    if(state.editingItemId) await saveEditedItem(); else await saveNewItem();
-  });
-  qs('#cancelBtn').addEventListener('click', resetItemForm);
-
-  qsa('input[name="categoria"]').forEach(r=>r.addEventListener('change',(e)=>{
-    state.filters.categoria = e.target.value; renderTable();
-    qs('#subtipoFilter').style.display = (state.filters.categoria==='herramienta') ? 'block' : 'none';
-  }));
-  qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{ state.filters.subtipo = e.target.value; renderTable(); }));
-  qs('#searchInput').addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
 }
 
 // =========================
