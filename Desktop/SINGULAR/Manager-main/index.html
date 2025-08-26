@@ -54,19 +54,10 @@
   <main class="app-main">
     <!-- HOME: solo selección y acciones -->
     <section id="view-home" class="card view" aria-label="Inicio">
-      <p class="muted">Selecciona una obra para gestionarla. Al seleccionar, te llevaremos al inventario.</p>
+      <p class="muted">Selecciona una obra y agrega ítems.</p>
       <div class="separator"></div>
-      <div class="row wrap">
-        <select id="obraSelect-home" class="hidden"></select> <!-- no usado: mantenemos #obraSelect del header -->
-      </div>
-    </section>
-  
-    <!-- INVENTARIO: formulario + tabla (filtros ocultos) -->
-    <section id="view-inventario" class="card view hidden" aria-labelledby="formTitle">
-      <!-- Filtros ocultos de momento -->
-      <div id="filtersSection" class="hidden"></div>
-  
-      <div class="separator"></div>
+    
+      <!-- Formulario AGREGAR ÍTEM (mismo IDs que antes) -->
       <h2 id="formTitle">Agregar Ítem</h2>
       <form id="itemForm" class="grid" novalidate>
         <label><span>Nombre *</span><input id="itemNombre" required /></label>
@@ -98,8 +89,11 @@
           <button id="cancelBtn" type="reset" class="btn ghost">Cancelar</button>
         </div>
       </form>
+    </section>
+    
   
-      <div class="separator"></div>
+    <!-- INVENTARIO: formulario + tabla (filtros ocultos) -->
+    <section id="view-inventario" class="card view hidden" aria-labelledby="inventario">
       <div class="row between">
         <h2 id="inventario">Inventario</h2>
         <div class="chips">
@@ -121,6 +115,7 @@
         </table>
       </div>
     </section>
+    
   
     <!-- AYUDA -->
     <section id="view-ayuda" class="card view hidden" aria-labelledby="como-usar">

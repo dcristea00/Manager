@@ -619,24 +619,13 @@ function addEventListeners() {
     (views[name]||views.home)?.classList.remove('hidden');
     (tabs[name]||tabs.home)?.classList.add('active');
   }
-
-  function applyRoute(){
-    const name = (location.hash.replace('#','') || 'home');
-    showView(name);
-  }
+  function applyRoute(){ showView((location.hash.replace('#','')||'home')); }
 
   window.addEventListener('hashchange', applyRoute);
   document.addEventListener('DOMContentLoaded', applyRoute);
 
-  // Ir a Inventario automáticamente al elegir obra en Home
-  const obraSelect = document.getElementById('obraSelect');
-  if (obraSelect) {
-    obraSelect.addEventListener('change', () => {
-      if (obraSelect.value && (location.hash === '' || location.hash === '#home')) {
-        location.hash = '#inventario';
-      }
-    });
-  }
+  // ⚠️ Eliminamos la auto-navegación al cambiar obra.
+  // (Mantén tus listeners de obraSelect para cargar items, pero sin cambiar el hash)
 })();
 
 
