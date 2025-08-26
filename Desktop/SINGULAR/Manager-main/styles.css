@@ -177,3 +177,28 @@ dialog[open]{ display:grid; place-items:center; }
 
 /* (Si en el futuro reactivas filtros, quedarán ocultos visualmente) */
 .pill-group, .searchbox { display: none !important; }
+
+
+/* ===== Header: utilidades para el layout en 2 filas ===== */
+.stack { display: grid; gap: 8px; }
+.w-full { width: 100%; }
+
+/* ===== Inventario: ajuste a borde lateral y sin desbordes en móvil ===== */
+body { overflow-x: hidden; } /* evita scroll horizontal accidental */
+
+#view-inventario { padding: 0; }                    /* quita relleno extra del section */
+#view-inventario.card { padding: 12px; }            /* padding uniforme del card */
+#view-inventario label { width: 100%; }             /* cada campo ocupa todo el ancho */
+#view-inventario input,
+#view-inventario select,
+#view-inventario textarea { max-width: 100%; }      /* nada se sale horizontalmente */
+#view-inventario .grid { grid-template-columns: 1fr; }
+#view-inventario .row { margin-left: 0; margin-right: 0; }
+#view-inventario .table-wrap { margin: 12px -1px 0; } /* la tabla “encaja” con el borde */
+
+@media (max-width: 430px){
+  .app-main { padding: 8px; }        /* acerca el contenido a los bordes del viewport */
+  .card { padding: 10px 12px; }      /* compacta tarjetas */
+  #formTitle { font-size: 18px; }
+  .btn { min-height: 44px; padding: 10px 14px; }
+}
