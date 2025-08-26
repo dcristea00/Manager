@@ -147,23 +147,6 @@ const DB = {
   },
   async createItem(it){
     try { return await API.itemCreate({
-      id: it.id, // por si lo generamos cliente
-      obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
-      cantidad: it.cantidad ?? 0, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
-    }); }
-    catch { const d=Local.load(); d.items.push(it); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
-  },
-  async updateItem(id, patch){
-    try { return await API.itemUpdate(id, patch); }
-    catch { const d=Local.load(); const it=d.items.find(x=>x.id===id); if(it) Object.assign(it, patch); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
-  },
-  async deleteItem(id){
-    try { await API.itemDelete(id); }
-    catch { const d=Local.load(); d.items = d.items.filter(i=>i.id!==id); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); }
-  }
-},
-  async createItem(it){
-    try { return await API.itemCreate({
       obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
       cantidad: it.cantidad ?? 0, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
     }); } 
@@ -211,10 +194,6 @@ function renderObrasSelect(){
   sel.value = state.selectedObraId || prev || '';
   const delBtn = qs('#obraDeleteBtn'); if (delBtn) delBtn.disabled = !sel.value;
   const editBtn = qs('#editObraBtn'); if (editBtn) editBtn.disabled = !sel.value;
-}">${o.nombre}</option>`).join('');
-  sel.value = state.selectedObraId || prev || '';
-  qs('#deleteObraBtn').disabled = !sel.value;
-  qs('#editObraBtn').disabled = !sel.value;
 }
 function renderBrandsSelect(){
   const select = qs('#itemMarca');
@@ -486,7 +465,7 @@ function addEventListeners(){
       window.scrollTo({top:0, behavior:'smooth'});
     }
   });
-}); });
+
   qs('#deleteObraBtn').addEventListener('click', async ()=>{ const id=qs('#obraSelect').value; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')) await deleteObra(id); });
 
   obraModal.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) closeObraModal(); });
