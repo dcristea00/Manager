@@ -148,7 +148,7 @@ const DB = {
   async createItem(it){
     try { return await API.itemCreate({
       obra_id: it.obraId, nombre: it.nombre, categoria: it.categoria, subtipo: it.subtipo||null,
-      cantidad: it.cantidad ?? 0, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
+      cantidad: it.cantidad ?? 1, marca: it.marca||null, ubicacion: it.ubicacion||null, observaciones: it.observaciones||null
     }); } 
     catch { const d=Local.load(); d.items.push(it); localStorage.setItem(CONFIG.storageKey, JSON.stringify(d)); return it; }
   },
@@ -437,15 +437,32 @@ function addEventListeners(){
   qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{ state.filters.subtipo = e.target.value; renderTable(); }));
   const search = qs('#searchInput'); if (search) search.addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
 
-  const tbody = qs('#tableBody'); if (tbody) tbody.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button'); if(!btn) return;
-    const tr = e.target.closest('tr'); const id = tr?.dataset.id; if(!id) return;
-    const action = btn.dataset.action; const item = state.items.find(i=>i.id===id);
-    if(!item) return;
-    if(action==='inc'){ item.cantidad = (item.cantidad||0) + 1; await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
-    if(action==='dec'){ item.cantidad = Math.max(0, (item.cantidad||0) - 1); await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
-    if(action==='delete'){ if(confirm('¿Eliminar ítem?')){ await DB.deleteItem(id); state.items = await DB.listItems(state.selectedObraId); renderTable(); } }
-    if(action==='edit'){
+  qs('#tableBody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    const id = tr?.dataset.id;
+    if (!id) return;
+  
+    const action = btn.dataset.action;
+    const item = state.items.find(i => i.id === id);
+    if (!item) return;
+  
+    if (action === 'inc' || action === 'dec') {
+      item.cantidad = Math.max(0, (item.cantidad || 0) + (action === 'inc' ? 1 : -1));
+      await DB.updateItem(id, { cantidad: item.cantidad });
+      renderTable();
+      return;
+    }
+  
+    if (action === 'delete') {
+      if (!confirm('¿Eliminar ítem?')) return;
+      await DB.deleteItem(id);
+      state.items = await DB.listItems(state.selectedObraId);
+      renderTable();
+      return;
+    }
+    if (action === 'edit') {
       state.editingItemId = id;
       qs('#formTitle').textContent = 'Editar Ítem';
       qs('#submitBtn').textContent = 'Guardar Cambios';
@@ -517,31 +534,6 @@ function addEventListeners(){
   }));
   qsa('input[name="subtipo"]').forEach(r=>r.addEventListener('change',(e)=>{ state.filters.subtipo = e.target.value; renderTable(); }));
   qs('#searchInput').addEventListener('input',(e)=>{ state.filters.search = e.target.value; renderTable(); });
-
-  qs('#tableBody').addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button'); if(!btn) return;
-    const tr = e.target.closest('tr'); const id = tr?.dataset.id; if(!id) return;
-    const action = btn.dataset.action; const item = state.items.find(i=>i.id===id);
-    if(action==='inc'){ item.cantidad = (item.cantidad||0) + 1; await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
-    if(action==='dec'){ item.cantidad = Math.max(0, (item.cantidad||0) - 1); await DB.updateItem(id, { cantidad: item.cantidad }); renderTable(); }
-    if(action==='delete'){ if(confirm('¿Eliminar ítem?')){ await DB.deleteItem(id); state.items = await DB.listItems(state.selectedObraId); renderTable(); } }
-    if(action==='edit'){
-      state.editingItemId = id;
-      qs('#formTitle').textContent = 'Editar Ítem';
-      qs('#submitBtn').textContent = 'Guardar Cambios';
-      qs('#itemNombre').value = item.nombre;
-      qs('#itemCategoria').value = item.categoria;
-      qs('#subtipoGroup').style.display = (item.categoria==='herramienta') ? 'block' : 'none';
-      qs('#itemSubtipo').value = item.subtipo || '';
-      renderBrandsSelect();
-      if(BRANDS.has(item.marca)){ qs('#itemMarca').value = item.marca; hide(qs('#marcaNuevaWrap')); }
-      else if(item.marca){ qs('#itemMarca').value='__new__'; show(qs('#marcaNuevaWrap')); qs('#itemMarcaNueva').value=item.marca; }
-      else { qs('#itemMarca').value=''; hide(qs('#marcaNuevaWrap')); }
-      qs('#itemUbicacion').value = item.ubicacion || '';
-      qs('#itemObservaciones').value = item.observaciones || '';
-      window.scrollTo({top:0, behavior:'smooth'});
-    }
-  });
 }
 
 // =========================
