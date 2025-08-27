@@ -1,71 +1,75 @@
-import { sql, json } from './_db.js';
+// netlify/functions/items.js
+import { sql } from './_db.js';
+
+const json = (statusCode, data) => ({
+  statusCode,
+  headers: {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+  },
+  body: JSON.stringify(data)
+});
 
 export async function handler(event) {
-  if (event.httpMethod === 'OPTIONS') return json(204, {});
+  const { httpMethod: method, queryStringParameters: qp = {} } = event;
+  if (method === 'OPTIONS') return json(200, { ok: true });
 
   try {
-    const qs = event.queryStringParameters || {};
-    const id = qs.id || null;
-    const obraId = qs.obraId || qs.obra_id || null;
-
-    // GET
-    if (event.httpMethod === 'GET') {
-      if (id) {
-        const rows = await sql`SELECT * FROM items WHERE id=${id}`;
-        return rows.length ? json(200, rows[0]) : json(404, { error: 'Not found' });
+    if (method === 'GET') {
+      const obraId = qp.obraId || qp.obra_id || null;
+      if (obraId) {
+        const rows = await sql`
+          select id, obra_id, nombre, categoria, subtipo, marca, ubicacion, observaciones, cantidad, created_at
+          from items where obra_id = ${obraId} order by created_at desc`;
+        return json(200, rows);
       }
-      const rows = obraId
-        ? await sql`SELECT * FROM items WHERE obra_id=${obraId} ORDER BY nombre`
-        : await sql`SELECT * FROM items ORDER BY nombre`;
+      const rows = await sql`
+        select id, obra_id, nombre, categoria, subtipo, marca, ubicacion, observaciones, cantidad, created_at
+        from items order by created_at desc`;
       return json(200, rows);
     }
 
-    // POST  ->  cantidad por defecto = 1 (y nunca < 0)
-    if (event.httpMethod === 'POST') {
-      const b = JSON.parse(event.body || '{}');
-      if (!b.obra_id) return json(400, { error: 'obra_id requerido' });
-      if (!b.nombre?.trim()) return json(400, { error: 'nombre requerido' });
-
-      let cantidad = Number(b.cantidad);
-      if (!Number.isFinite(cantidad)) cantidad = 1;   // <- clave: default 1
-      if (cantidad < 0) cantidad = 0;
-
-      const [row] = await sql`
-        INSERT INTO items (obra_id, nombre, categoria, subtipo, cantidad, marca, ubicacion, observaciones)
-        VALUES (${b.obra_id}, ${b.nombre.trim()}, ${b.categoria || null}, ${b.subtipo || null}, ${cantidad},
-                ${b.marca || null}, ${b.ubicacion || null}, ${b.observaciones || null})
-        RETURNING *`;
-      return json(201, row);
-    }
-
-    // PUT (parcial por COALESCE)
-    if (event.httpMethod === 'PUT') {
-      if (!id) return json(400, { error: 'id requerido' });
-      const b = JSON.parse(event.body || '{}');
-
+    if (method === 'POST') {
+      const b = JSON.parse(event.body||'{}');
+      const obraId = b.obraId || b.obra_id;
+      if (!obraId || !b.nombre || !b.categoria || !b.marca) return json(400,{error:'faltan campos'});
+      const subtipo = b.categoria === 'herramienta' ? (b.subtipo || null) : null;
+      const cantidad = Math.max(0, parseInt(b.cantidad ?? 1, 10) || 0);
       const rows = await sql`
-        UPDATE items SET
-          nombre       = COALESCE(${b.nombre ?? null}, nombre),
-          categoria    = COALESCE(${b.categoria ?? null}, categoria),
-          subtipo      = COALESCE(${b.subtipo ?? null}, subtipo),
-          cantidad     = COALESCE(${b.cantidad ?? null}, cantidad),
-          marca        = COALESCE(${b.marca ?? null}, marca),
-          ubicacion    = COALESCE(${b.ubicacion ?? null}, ubicacion),
-          observaciones= COALESCE(${b.observaciones ?? null}, observaciones)
-        WHERE id=${id}
-        RETURNING *`;
-      return rows.length ? json(200, rows[0]) : json(404, { error: 'Not found' });
+        insert into items (obra_id, nombre, categoria, subtipo, marca, ubicacion, observaciones, cantidad)
+        values (${obraId}, ${b.nombre}, ${b.categoria}, ${subtipo}, ${b.marca}, ${b.ubicacion||''}, ${b.observaciones||''}, ${cantidad})
+        returning id, obra_id, nombre, categoria, subtipo, marca, ubicacion, observaciones, cantidad, created_at`;
+      return json(200, rows[0]);
     }
 
-    // DELETE
-    if (event.httpMethod === 'DELETE') {
-      if (!id) return json(400, { error: 'id requerido' });
-      await sql`DELETE FROM items WHERE id=${id}`;
-      return json(204, {});
+    if (method === 'PUT') {
+      const id = qp.id; if(!id) return json(400,{error:'id requerido'});
+      const b = JSON.parse(event.body||'{}');
+      const fields = [];
+      if (b.nombre != null)       fields.push(sql`nombre = ${b.nombre}`);
+      if (b.categoria != null)    fields.push(sql`categoria = ${b.categoria}`);
+      if (b.subtipo !== undefined)fields.push(sql`subtipo = ${b.subtipo || null}`);
+      if (b.marca != null)        fields.push(sql`marca = ${b.marca}`);
+      if (b.ubicacion != null)    fields.push(sql`ubicacion = ${b.ubicacion}`);
+      if (b.observaciones != null)fields.push(sql`observaciones = ${b.observaciones}`);
+      if (b.cantidad != null)     fields.push(sql`cantidad = ${Math.max(0, parseInt(b.cantidad,10)||0)}`);
+      if (b.obra_id)              fields.push(sql`obra_id = ${b.obra_id}`); // permitir TRASPASO
+      if (!fields.length) return json(400,{error:'sin cambios'});
+      const q = sql`update items set ${sql.join(fields, sql`, `)} where id = ${id} returning *`;
+      const rows = await q;
+      return json(200, rows[0]||{});
     }
 
-    return json(405, { error: 'Método no soportado' });
+    if (method === 'DELETE') {
+      const id = qp.id; if(!id) return json(400,{error:'id requerido'});
+      await sql`delete from items where id = ${id}`;
+      return json(200, { success:true });
+    }
+
+    return json(405, { error: 'method not allowed' });
   } catch (err) {
-    return json(500, { error: err.message });
+    return json(500, { error: String(err.message||err) });
   }
 }

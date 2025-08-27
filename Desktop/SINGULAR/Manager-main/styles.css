@@ -95,9 +95,9 @@ dialog[open]{position:fixed;inset:0;display:flex;align-items:center;justify-cont
 dialog::backdrop{background:rgba(0,0,0,.55)}
 .dialog-card{background:#fff;color:#0f172a;border:1px solid #dfe7f2;border-radius:18px;width:min(520px,92vw);max-height:85vh;display:grid;grid-template-rows:auto 1fr auto;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45)}
 .dialog-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #e6eef8;background:#f7faff}
-.dialog-head h3{margin:0;font-size:18px;color:#0b2c4d}
+.dialog-head h3{margin:0;font-size:18px;color:#153a5e}
 .dialog-body{padding:12px 14px;overflow:auto;background:#fff}
-.dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid #e6eef8;background:#b1bdd2}
+.dialog-foot{display:flex;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid #8da3be;background:#595b60}
 
 /* Tabs */
 .tabbar{position:sticky;bottom:0;z-index:10;border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(18,43,71,.6),rgba(18,43,71,.9));backdrop-filter:blur(10px);display:grid;grid-template-columns:repeat(6,1fr)}
