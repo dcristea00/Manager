@@ -13,18 +13,23 @@
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
     <symbol id="i-cats" viewBox="0 0 24 24"><path d="M5 6h14v3H5zM5 11h14v3H5zM5 16h14v3H5z"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke-width="2"/><path d="M8 12h8M8 9h8M8 15h8" stroke-width="2"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 8.5a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4ZM11 11h2v7h-2z"/><circle cx="12" cy="12" r="10" fill="none" stroke-width="1.5"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 8v9m0 0 4-4m-4 4-4-4M5 20h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Z"/><path d="M14.06 6.19 16.88 3.37 20.63 7.12 17.81 9.94z"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0 1 12h8l1-12" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M5 19l1.5-1.5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 7h4l2-2h4l2 2h4v12H4z" fill="none" stroke-width="2"/><circle cx="12" cy="13" r="4"/></symbol>
   </defs></svg>
 
   <header class="app-header">
     <div class="header-row">
       <h1 class="app-title">INVOBRA</h1>
+      <button id="themeToggleBtn" class="btn ghost" aria-label="Cambiar tema"><svg class="i"><use id="themeIcon" href="#i-moon"/></svg></button>
     </div>
-    <div class="toolbar" id="home-toolbar">
+    <div class="toolbar" id="obra-toolbar">
       <div class="stack">
         <div class="row"><select id="obraSelect" aria-label="Seleccionar Obra" class="w-full"></select></div>
         <div class="row wrap">
@@ -38,10 +43,14 @@
   </header>
 
   <main class="app-main">
-    <!-- HOME: form para agregar ítems a la obra seleccionada -->
-    <section id="view-home" class="card view" aria-label="Inicio">
-      <p class="muted">Selecciona una obra y agrega ítems.</p>
-      <div class="separator"></div>
+    <!-- INICIO: dashboard de obras con fotos -->
+    <section id="view-inicio" class="view">
+      <h2 class="view-title">Obras</h2>
+      <div id="inicioGrid" class="grid-cards"></div>
+    </section>
+
+    <!-- AÑADIR: formulario para agregar ítems a la obra seleccionada -->
+    <section id="view-anadir" class="card view hidden" aria-label="Añadir">
       <h2 id="formTitle">Agregar Ítem</h2>
       <form id="itemForm" class="grid" novalidate>
         <label><span>Nombre *</span><input id="itemNombre" required /></label>
@@ -66,6 +75,7 @@
           </select>
         </label>
         <label id="marcaNuevaWrap" class="hidden"><span>Nueva marca</span><input id="itemMarcaNueva" /></label>
+        <label><span>Cantidad</span><input id="itemCantidad" type="number" min="0" value="1" /></label>
         <label class="full"><span>Ubicación</span><input id="itemUbicacion" placeholder="ej: Almacén 1 / Estante A" /></label>
         <label class="full"><span>Observaciones</span><textarea id="itemObservaciones" rows="3" placeholder="Notas adicionales..."></textarea></label>
         <div class="row">
@@ -75,33 +85,36 @@
       </form>
     </section>
 
-    <!-- INVENTARIO: sólo tabla -->
-    <section id="view-inventario" class="card view hidden" aria-labelledby="inventario">
-      <div class="row between">
-        <h2 id="inventario">Inventario</h2>
-        <div class="chips">
-          <span class="chip">Visibles <strong id="visibleCount">0</strong></span>
-          <span class="chip">Total <strong id="totalCount">0</strong></span>
+    <!-- INVENTARIO: ficha de obra + lista (sin +/-) -->
+    <section id="view-inventario" class="view hidden" aria-labelledby="inventario">
+      <div id="obraInfo" class="card compact"></div>
+      <div class="card">
+        <div class="row between">
+          <h2 id="inventario">Inventario</h2>
+          <div class="chips">
+            <span class="chip">Visibles <strong id="visibleCount">0</strong></span>
+            <span class="chip">Total <strong id="totalCount">0</strong></span>
+          </div>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th><th>Cat.</th><th>Subtipo</th><th>Cant.</th>
-              <th>Marca</th><th>Ubicación</th><th>Observaciones</th><th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <tr><td colspan="8" class="empty">Selecciona una obra…</td></tr>
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th><th>Cat.</th><th>Subtipo</th><th>Cant.</th>
+                <th>Marca</th><th>Ubicación</th><th>Observaciones</th><th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="8" class="empty">Selecciona una obra…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <!-- CATEGORÍAS -->
+    <!-- CATEGORÍAS (sin toolbar de obra) -->
     <section id="view-categorias" class="card view hidden" aria-label="Categorías">
-      <h2>Categorías y Marcas</h2>
+      <h2 class="view-title">Categorías y Marcas</h2>
       <div class="row wrap">
         <label>
           <span>Categoría</span>
@@ -121,46 +134,26 @@
       <div id="catResults" class="grid" style="grid-template-columns:1fr;gap:8px"></div>
     </section>
 
-    <!-- AYUDA -->
-    <section id="view-ayuda" class="card view hidden" aria-labelledby="como-usar">
-      <h2 id="como-usar">Ayuda</h2>
-      <ol class="muted">
-        <li>En <b>Inicio</b> añade ítems a la obra seleccionada.</li>
-        <li>En <b>Inventario</b> consulta y ajusta cantidades.</li>
-        <li>En <b>Categorías</b> explora por categoría, subtipo o marca.</li>
-        <li>En <b>Datos</b> descarga reportes legibles (HTML).</li>
-      </ol>
+    <!-- PRECIOS (futuro) -->
+    <section id="view-precios" class="card view hidden" aria-label="Precios">
+      <h2 class="view-title">Precios (próximamente)</h2>
+      <p class="muted">Pantalla reservada para gestionar tarifas y precios.</p>
     </section>
 
-    <!-- DATOS -->
+    <!-- DATOS (placeholder) -->
     <section id="view-datos" class="card view hidden" aria-label="Datos">
-      <h2>Descargas</h2>
-      <div class="row wrap">
-        <button id="downloadObraBtn" type="button" class="btn"><svg class="i"><use href="#i-download"/></svg><span>Reporte de esta obra (HTML)</span></button>
-      </div>
-      <div class="separator"></div>
-      <h3>Por categoría</h3>
-      <div class="row wrap">
-        <label><span>Categoría</span>
-          <select id="downCategoria"><option value="herramienta">Herramienta</option><option value="material">Material</option></select>
-        </label>
-        <label id="downSubtipoWrap"><span>Subtipo</span>
-          <select id="downSubtipo"><option value="all">Todas</option><option value="electrica">Eléctrica</option><option value="manual">Manual</option></select>
-        </label>
-        <label><span>Marca</span>
-          <select id="downMarca"><option value="all">Todas</option></select>
-        </label>
-        <button id="downloadCatBtn" type="button" class="btn"><svg class="i"><use href="#i-download"/></svg><span>Descargar (HTML)</span></button>
-      </div>
+      <h2 class="view-title">Datos</h2>
+      <p class="muted">De momento no hay acciones aquí.</p>
     </section>
   </main>
 
   <!-- TABS -->
   <nav class="tabbar" aria-label="Navegación">
-    <a href="#home" class="tab" id="nav-home"><svg class="i"><use href="#i-home"/></svg><span>Inicio</span></a>
+    <a href="#inicio" class="tab" id="nav-inicio"><svg class="i"><use href="#i-home"/></svg><span>Inicio</span></a>
+    <a href="#anadir" class="tab" id="nav-anadir"><svg class="i"><use href="#i-plus"/></svg><span>Añadir</span></a>
     <a href="#inventario" class="tab" id="nav-inventario"><svg class="i"><use href="#i-list"/></svg><span>Inventario</span></a>
     <a href="#categorias" class="tab" id="nav-categorias"><svg class="i"><use href="#i-cats"/></svg><span>Categorías</span></a>
-    <a href="#ayuda" class="tab" id="nav-ayuda"><svg class="i"><use href="#i-info"/></svg><span>Ayuda</span></a>
+    <a href="#precios" class="tab" id="nav-precios"><svg class="i"><use href="#i-coin"/></svg><span>Precios</span></a>
     <a href="#datos" class="tab" id="nav-datos"><svg class="i"><use href="#i-download"/></svg><span>Datos</span></a>
   </nav>
 
