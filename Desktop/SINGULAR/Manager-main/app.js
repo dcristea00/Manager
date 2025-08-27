@@ -296,25 +296,150 @@ function renderInicio(){
 }
 
 // ---------- Categorías ----------
+// 1) Cargar datos transversales (todas las obras + todos los ítems)
 const Cross = { allItems:null, obrasById:new Map(), brands:new Set() };
-async function ensureCrossData(){ if(!state.obras?.length){ try{ state.obras = await API.obrasList(); }catch{} } Cross.obrasById=new Map(state.obras.map(o=>[o.id,o])); if(!Cross.allItems){ try{ Cross.allItems = await API.itemsAll(); }catch{ Cross.allItems=[]; } } Cross.brands=new Set(Cross.allItems.map(i=>i.marca).filter(Boolean)); }
 
+async function ensureCrossData(){
+  if(!state.obras?.length){
+    try { state.obras = await API.obrasList(); } catch {}
+  }
+  Cross.obrasById = new Map(state.obras.map(o => [o.id, o]));
+
+  // Intento 1: endpoint de todos los ítems
+  try {
+    const arr = await API.itemsAll();
+    if (!Array.isArray(arr)) throw new Error('bad payload');
+    Cross.allItems = arr;
+  } catch {
+    // Fallback: juntar ítems obra por obra
+    const packs = await Promise.all(
+      state.obras.map(o => API.itemsByObra(o.id).catch(() => []))
+    );
+    Cross.allItems = packs.flat();
+  }
+  Cross.brands = new Set(Cross.allItems.map(i => i.marca).filter(Boolean));
+}
+
+// 2) Inicializar vista Categorías (con filtro de Obra)
 async function initCategoriasView(){
   await ensureCrossData();
-  const catSel = qs('#catCategoria'); const subWrap = qs('#catSubtipoWrap'); const subSel = qs('#catSubtipo'); const marcaSel = qs('#catMarca');
-  marcaSel.innerHTML = '<option value="all">Todas</option>' + [...Cross.brands].sort().map(b=>`<option>${escapeHtml(b)}</option>`).join('');
-  function toggle(){ subWrap.style.display = (catSel.value==='herramienta') ? 'inline-block' : 'none'; }
-  function apply(){ const cat=catSel.value; const subt=(cat==='herramienta')?subSel.value:'all'; const brand=marcaSel.value; const filtered = Cross.allItems.filter(i=> i.categoria===cat && (cat!=='herramienta'||subt==='all'||i.subtipo===subt) && (brand==='all'||i.marca===brand) ); renderCatResults(filtered); }
-  catSel.onchange=()=>{ toggle(); apply(); }; subSel.onchange=apply; marcaSel.onchange=apply; toggle(); apply();
+
+  const obraSel   = qs('#catObra');
+  const catSel    = qs('#catCategoria');
+  const subWrap   = qs('#catSubtipoWrap');
+  const subSel    = qs('#catSubtipo');
+  const marcaSel  = qs('#catMarca');
+
+  // Poblar obras y marcas (globales)
+  if (obraSel) {
+    obraSel.innerHTML =
+      '<option value="all">Todas</option>' +
+      state.obras.map(o => `<option value="${o.id}">${escapeHtml(o.nombre)}</option>`).join('');
+  }
+  if (marcaSel) {
+    marcaSel.innerHTML =
+      '<option value="all">Todas</option>' +
+      [...Cross.brands].sort().map(b => `<option>${escapeHtml(b)}</option>`).join('');
+  }
+
+  function toggleSubtipo(){
+    subWrap.style.display = (catSel.value === 'herramienta') ? 'inline-block' : 'none';
+  }
+
+  function apply(){
+    const obra  = obraSel?.value || 'all';
+    const cat   = catSel.value;                         // herramienta | material
+    const subt  = (cat === 'herramienta') ? subSel.value : 'all';  // all | electrica | manual
+    const brand = marcaSel.value;                       // all | marca
+
+    const filtered = Cross.allItems.filter(i =>
+      (obra === 'all' || i.obra_id === obra) &&
+      i.categoria === cat &&
+      (cat !== 'herramienta' || subt === 'all' || i.subtipo === subt) &&
+      (brand === 'all' || i.marca === brand)
+    );
+    renderCatResults(filtered, { obra, cat, subt, brand });
+  }
+
+  catSel.onchange    = () => { toggleSubtipo(); apply(); };
+  subSel.onchange    = apply;
+  marcaSel.onchange  = apply;
+  obraSel.onchange   = apply;
+
+  toggleSubtipo();
+  apply();
 }
 
-function renderCatResults(items){
-  const box = qs('#catResults'); const sum=qs('#catSummary'); const byId = Cross.obrasById; const total=items.length, unidades=items.reduce((s,i)=>s+(i.cantidad||0),0);
-  sum.textContent = `Ítems: ${total} · Unidades: ${unidades}`;
-  if(!items.length){ box.innerHTML = '<div class="muted">Sin resultados</div>'; return; }
-  const byObra = group(items, i=> byId.get(i.obra_id)?.nombre || i.obra_id);
-  box.innerHTML = Object.entries(byObra).map(([obra, arr])=>`<div class="card"><h3 style="margin:0 0 6px">${escapeHtml(obra)}</h3><ul style="margin:0;padding-left:1.1rem">${arr.map(i=>`<li>${escapeHtml(i.nombre)} — <b>${i.cantidad||0}</b> · ${i.categoria}${i.subtipo?(' ('+i.subtipo+')'):''} · ${escapeHtml(i.marca||'')}</li>`).join('')}</ul></div>`).join('');
+// 3) Render compacto de resultados (totales por obra)
+function renderCatResults(items, { obra, cat, subt, brand }){
+  const box = qs('#catResults');
+  const sum = qs('#catSummary');
+
+  const totalItems  = items.length;
+  const totalUnits  = items.reduce((s, i) => s + (i.cantidad || 0), 0);
+  sum.textContent = `Ítems: ${totalItems} · Unidades: ${totalUnits}`;
+
+  // Agrupar por obra (si 'obra' = all); si está fijada una obra, solo esa card
+  let groups;
+  if (obra === 'all') {
+    groups = Object.entries(items.reduce((m, i) => {
+      const key = Cross.obrasById.get(i.obra_id)?.nombre || i.obra_id;
+      (m[key] ??= []).push(i);
+      return m;
+    }, {}));
+  } else {
+    const name = Cross.obrasById.get(obra)?.nombre || obra;
+    groups = [[name, items]];
+  }
+
+  // Utilidades de conteo
+  const count = (arr, fn) => arr.reduce((m, x) => { const k = fn(x) || '—'; m[k] = (m[k]||0) + 1; return m; }, {});
+  const sumUn = (arr, fn) => arr.reduce((m, x) => { const k = fn(x) || '—'; m[k] = (m[k]||0) + (x.cantidad||0); return m; }, {});
+
+  const html = groups.map(([obraNombre, arr]) => {
+    const itemsN   = arr.length;
+    const unitsN   = arr.reduce((s, i) => s + (i.cantidad || 0), 0);
+
+    // Desglose según filtros actuales (compacto, sólo números)
+    let extra = '';
+    if (cat === 'herramienta' && subt === 'all') {
+      const bySubItems = count(arr, i => i.subtipo);
+      const bySubUnits = sumUn(arr, i => i.subtipo);
+      const e  = bySubItems['electrica'] || 0,  em = bySubUnits['electrica'] || 0;
+      const m  = bySubItems['manual']    || 0,  mm = bySubUnits['manual']    || 0;
+      extra = `<div class="muted">Subtipos: Eléctrica ${e} (${em}) · Manual ${m} (${mm})</div>`;
+    }
+
+    if (brand === 'all') {
+      const byBrand = count(arr, i => i.marca);
+      // Top 6 marcas (solo número de ítems, para mantenerlo breve)
+      const top = Object.entries(byBrand)
+        .sort((a,b)=>b[1]-a[1]).slice(0,6)
+        .map(([k,v])=>`${escapeHtml(k)} ${v}`).join(' · ');
+      if (top) extra += `<div class="muted">Marcas: ${top}</div>`;
+    } else {
+      const brandItems = arr.filter(i => i.marca === brand);
+      const brandUnits = brandItems.reduce((s,i)=>s+(i.cantidad||0),0);
+      extra += `<div class="muted">Marca ${escapeHtml(brand)}: ${brandItems.length} (${brandUnits})</div>`;
+    }
+
+    return `
+      <div class="card">
+        <div class="row between">
+          <h3 style="margin:0">${escapeHtml(obraNombre)}</h3>
+          <div class="chips">
+            <span class="chip">Ítems ${itemsN}</span>
+            <span class="chip">Unid. ${unitsN}</span>
+          </div>
+        </div>
+        ${extra}
+      </div>
+    `;
+  }).join('') || '<div class="muted">Sin resultados</div>';
+
+  box.innerHTML = html;
 }
+
 
 // ---------- Router ----------
 function showView(name){
