@@ -630,6 +630,215 @@ function addEventListeners() {
 
 
 // =========================
+// Módulo: Categorías + Export bonito (APPEND)
+// =========================
+const Cross = {
+  allItems: null,
+  obrasById: new Map(),
+  brands: new Set(),
+};
+
+async function ensureCrossData() {
+  // Map de obras (para nombrar en listados transversales)
+  if (!state?.obras || state.obras.length === 0) {
+    try {
+      const r = await fetch('/.netlify/functions/obras');
+      state.obras = await r.json();
+    } catch {}
+  }
+  Cross.obrasById = new Map(state.obras.map(o => [o.id, o]));
+
+  // Todos los ítems (si no los tenemos)
+  if (!Cross.allItems) {
+    const r = await fetch('/.netlify/functions/items');
+    Cross.allItems = await r.json();
+  }
+  Cross.brands = new Set(Cross.allItems.map(i => i.marca).filter(Boolean));
+}
+
+function downloadFile(filename, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function fmtDate(d=new Date()){return d.toLocaleString('es-ES',{hour12:false})}
+
+function buildObraReportHTML(obra, items){
+  const total = items.length;
+  const sumCantidad = items.reduce((s,i)=>s+(i.cantidad||0),0);
+  const byCat = group(items, i=>i.categoria);
+  const bySub = group(items.filter(i=>i.categoria==='herramienta'), i=>i.subtipo||'—');
+  const byMarca = group(items, i=>i.marca||'—');
+  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>INVOBRA – ${obra.nombre}</title>
+  <style>body{font:14px/1.45 system-ui,Segoe UI,Roboto,Arial;margin:24px;color:#0f172a}
+  h1,h2{margin:.2rem 0} .muted{color:#475569} .card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin:10px 0}
+  table{width:100%;border-collapse:collapse} th,td{padding:8px;border-bottom:1px solid #e2e8f0;text-align:left}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+  .chip{display:inline-block;border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;margin-right:6px}
+  </style>
+  <h1>INVOBRA — Resumen de Obra</h1>
+  <div class="muted">Obra: <b>${obra.nombre}</b> · Generado: ${fmtDate()}</div>
+  <div class="grid">
+    <div class="card"><h2>Totales</h2><div class="chip">Ítems: ${total}</div><div class="chip">Unidades: ${sumCantidad}</div></div>
+    <div class="card"><h2>Categorías</h2>${Object.entries(byCat).map(([k,v])=>`<div>${k}: <b>${v.length}</b></div>`).join('')}</div>
+    <div class="card"><h2>Subtipos</h2>${Object.entries(bySub).map(([k,v])=>`<div>${k}: <b>${v.length}</b></div>`).join('')||'—'}</div>
+    <div class="card"><h2>Marcas</h2>${Object.entries(byMarca).slice(0,20).map(([k,v])=>`<div>${k}: <b>${v.length}</b></div>`).join('')}</div>
+  </div>
+  <div class="card">
+    <h2>Detalle</h2>
+    <table><thead><tr><th>Nombre</th><th>Categoría</th><th>Subtipo</th><th>Cantidad</th><th>Marca</th><th>Ubicación</th><th>Observaciones</th></tr></thead>
+    <tbody>
+      ${items.map(i=>`<tr><td>${esc(i.nombre)}</td><td>${i.categoria}</td><td>${i.subtipo||'—'}</td><td>${i.cantidad||0}</td><td>${esc(i.marca||'')}</td><td>${esc(i.ubicacion||'')}</td><td>${esc(i.observaciones||'')}</td></tr>`).join('')}
+    </tbody></table>
+  </div>`;
+}
+
+function buildCategoryReportHTML(cat, subtipo, marca, items, obrasById){
+  const title = `Inventario por categoría: ${cat}${cat==='herramienta' && subtipo!=='all' ? ' · '+subtipo : ''}${marca!=='all' ? ' · Marca '+marca : ''}`;
+  const list = items.map(i=>({
+    obra: obrasById.get(i.obra_id)?.nombre || i.obra_id,
+    nombre: i.nombre, categoria: i.categoria, subtipo: i.subtipo||'—', cantidad: i.cantidad||0, marca: i.marca||'—'
+  }));
+  const total = list.length, unidades = list.reduce((s,x)=>s+(x.cantidad||0),0);
+  const porObra = group(list, x=>x.obra);
+  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>INVOBRA – ${title}</title>
+  <style>body{font:14px/1.5 system-ui,Segoe UI,Roboto,Arial;margin:24px;color:#0f172a} h1{margin:.2rem 0}
+  .muted{color:#475569} .card{border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin:10px 0}
+  ul{margin:0;padding-left:1.1rem} li{margin:.2rem 0}
+  </style>
+  <h1>${esc(title)}</h1><div class="muted">Generado: ${fmtDate()}</div>
+  <div class="card"><b>Resumen:</b> Ítems ${total} · Unidades ${unidades}</div>
+  ${Object.entries(porObra).map(([obra, arr])=>`<div class="card"><h2>${esc(obra)}</h2><ul>${arr.map(r=>`<li>${esc(r.nombre)} — <b>${r.cantidad}</b> · ${r.categoria}${r.subtipo!=='—'?(' ('+r.subtipo+')'):''} · ${esc(r.marca)}</li>`).join('')}</ul></div>`).join('')}`;
+}
+
+function esc(s){return String(s||'').replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c])}
+function group(arr, by){return arr.reduce((m,x)=>{const k=by(x); (m[k]||= []).push(x); return m},{})}
+
+// ============ Vista CATEGORÍAS ============
+async function initCategoriasView(){
+  await ensureCrossData();
+  // Selects
+  const catSel = document.getElementById('catCategoria');
+  const subWrap = document.getElementById('catSubtipoWrap');
+  const subSel = document.getElementById('catSubtipo');
+  const marcaSel = document.getElementById('catMarca');
+
+  // Poblar marcas globales
+  marcaSel.innerHTML = '<option value="all">Todas</option>' + [...Cross.brands].sort().map(b=>`<option>${esc(b)}</option>`).join('');
+
+  function toggleSub(){ subWrap.style.display = (catSel.value==='herramienta') ? 'inline-block' : 'none'; }
+  toggleSub();
+
+  function apply(){
+    const cat = catSel.value;
+    const subt = (cat==='herramienta') ? subSel.value : 'all';
+    const brand = marcaSel.value;
+    const filtered = Cross.allItems.filter(i => (
+      i.categoria===cat &&
+      (cat!=='herramienta' || subt==='all' || i.subtipo===subt) &&
+      (brand==='all' || i.marca===brand)
+    ));
+    renderCatResults(filtered);
+  }
+
+  catSel.onchange = ()=>{ toggleSub(); apply(); };
+  subSel.onchange = apply; marcaSel.onchange = apply;
+  apply();
+}
+
+function renderCatResults(items){
+  const box = document.getElementById('catResults');
+  const sum = document.getElementById('catSummary');
+  const obrasById = Cross.obrasById;
+  const total = items.length, unidades = items.reduce((s,i)=>s+(i.cantidad||0),0);
+  sum.textContent = `Ítems: ${total} · Unidades: ${unidades}`;
+  if (!items.length){ box.innerHTML = '<div class="muted">Sin resultados</div>'; return; }
+  const byObra = group(items, i=>obrasById.get(i.obra_id)?.nombre || i.obra_id);
+  box.innerHTML = Object.entries(byObra).map(([obra, arr])=>`
+    <div class="card">
+      <h3 style="margin:0 0 6px">${esc(obra)}</h3>
+      <ul style="margin:0;padding-left:1.1rem">
+        ${arr.map(i=>`<li>${esc(i.nombre)} — <b>${i.cantidad||0}</b> · ${i.categoria}${i.subtipo?(' ('+i.subtipo+')'):''} · ${esc(i.marca||'')}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+}
+
+// ============ Descargas (Datos) ============
+async function initDescargas(){
+  await ensureCrossData();
+  const obra = state.obras.find(o=>o.id===state.selectedObraId);
+  const downCat = document.getElementById('downCategoria');
+  const downSubWrap = document.getElementById('downSubtipoWrap');
+  const downSub = document.getElementById('downSubtipo');
+  const downMarca = document.getElementById('downMarca');
+  const brands = [...Cross.brands].sort();
+  downMarca.innerHTML = '<option value="all">Todas</option>' + brands.map(b=>`<option>${esc(b)}</option>`).join('');
+  function toggle(){ downSubWrap.style.display = (downCat.value==='herramienta') ? 'inline-block' : 'none'; }
+  downCat.onchange = ()=>{ toggle(); };
+  toggle();
+
+  // Descargar reporte de la obra seleccionada
+  const btnObra = document.getElementById('downloadObraBtn');
+  if (btnObra) btnObra.onclick = async ()=>{
+    if (!state.selectedObraId) { toast?.('error','Selecciona una obra'); return; }
+    const items = await DB.listItems(state.selectedObraId);
+    const html = buildObraReportHTML(obra||{nombre: state.selectedObraId}, items);
+    downloadFile(`invobra-${(obra?.nombre||'obra')}.html`, 'text/html;charset=utf-8', html);
+  };
+
+  // Descargar reporte por categoría
+  const btnCat = document.getElementById('downloadCatBtn');
+  if (btnCat) btnCat.onclick = ()=>{
+    const cat = downCat.value; const subt = (cat==='herramienta') ? downSub.value : 'all'; const brand = downMarca.value;
+    const items = Cross.allItems.filter(i => (
+      i.categoria===cat &&
+      (cat!=='herramienta' || subt==='all' || i.subtipo===subt) &&
+      (brand==='all' || i.marca===brand)
+    ));
+    const html = buildCategoryReportHTML(cat, subt, brand, items, Cross.obrasById);
+    const name = `invobra-${cat}${cat==='herramienta'&&subt!=='all'?('-'+subt):''}${brand!=='all'?('-'+brand):''}.html`;
+    downloadFile(name, 'text/html;charset=utf-8', html);
+  };
+}
+
+// ============ Router: añade vista categorías y evita duplicados ============
+(function enhanceRouter(){
+  const views = {
+    home: document.getElementById('view-home'),
+    inventario: document.getElementById('view-inventario'),
+    categorias: document.getElementById('view-categorias'),
+    ayuda: document.getElementById('view-ayuda'),
+    datos: document.getElementById('view-datos'),
+  };
+  const tabs = {
+    home: document.getElementById('nav-home'),
+    inventario: document.getElementById('nav-inventario'),
+    categorias: document.getElementById('nav-categorias'),
+    ayuda: document.getElementById('nav-ayuda'),
+    datos: document.getElementById('nav-datos'),
+  };
+  function showView(name){
+    Object.values(views).forEach(v=>v&&v.classList.add('hidden'));
+    Object.values(tabs).forEach(t=>t&&t.classList.remove('active'));
+    (views[name]||views.home)?.classList.remove('hidden');
+    (tabs[name]||tabs.home)?.classList.add('active');
+  }
+  async function applyRoute(){
+    const name = (location.hash.replace('#','')||'home');
+    showView(name);
+    if (name==='categorias') await initCategoriasView();
+    if (name==='datos') await initDescargas();
+  }
+  window.addEventListener('hashchange', applyRoute);
+  document.addEventListener('DOMContentLoaded', applyRoute);
+})();
+
+
+
+// =========================
 // Init
 // =========================
 async function init(){

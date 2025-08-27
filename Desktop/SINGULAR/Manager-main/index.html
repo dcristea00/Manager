@@ -10,160 +10,88 @@
 </head>
 
 <body>
-    <!-- ICONOS -->
-  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
-    <defs>
-      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-10.5Z"/></symbol>
-      <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-      <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 8.5a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4ZM11 11h2v7h-2z"/><circle cx="12" cy="12" r="10" fill="none" stroke-width="1.5"/></symbol>
-      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Z"/><path d="M14.06 6.19 16.88 3.37 20.63 7.12 17.81 9.94z"/></symbol>
-      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2m-8 0 1 12h8l1-12" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 8v9m0 0 4-4m-4 4-4-4M5 20h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V7m0 0 4 4m-4-4-4 4M5 20h14" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-    </defs>
-  </svg>
+  <li>En <b>Inventario</b> consulta y ajusta cantidades.</li>
+  <li>En <b>Categorías</b> explora todo por categoría o marca.</li>
+  <li>En <b>Datos</b> descarga reportes legibles.</li>
+  </ol>
+  </section>
 
-
-  <header class="app-header">
-    <div class="header-row">
-      <h1 class="app-title">INVOBRA</h1>
+  <!-- DATOS / Descargas -->
+  <section id="view-datos" class="card view hidden" aria-label="Datos">
+    <h2>Descargas</h2>
+    <div class="row wrap">
+      <button id="downloadObraBtn" type="button" class="btn"><svg class="i">
+          <use href="#i-download" />
+        </svg><span>Reporte de esta obra (HTML)</span></button>
     </div>
-  
-    <!-- Menú/acciones de HOME -->
-    <div class="toolbar" id="home-toolbar">
-      <div class="stack">
-        <!-- FILA 1: SELECT (full width, arriba) -->
-        <div class="row">
-          <select id="obraSelect" aria-label="Seleccionar Obra" class="w-full"></select>
-        </div>
-    
-        <!-- FILA 2: BOTONES -->
-        <div class="row wrap">
-          <button id="nuevaObraBtn" type="button" class="btn primary"><svg class="i"><use href="#i-plus"/></svg><span>Nueva</span></button>
-          <button id="editObraBtn"  type="button" class="btn square"><svg class="i"><use href="#i-edit"/></svg></button>
-          <button id="deleteObraBtn" type="button" class="btn danger square"><svg class="i"><use href="#i-trash"/></svg></button>
-        </div>
-      </div>
-    
-      <div id="alertContainer" class="alert-region" aria-live="polite"></div>
+    <div class="separator"></div>
+    <h3>Por categoría</h3>
+    <div class="row wrap">
+      <label>
+        <span>Categoría</span>
+        <select id="downCategoria">
+          <option value="herramienta">Herramienta</option>
+          <option value="material">Material</option>
+        </select>
+      </label>
+      <label id="downSubtipoWrap">
+        <span>Subtipo</span>
+        <select id="downSubtipo">
+          <option value="all">Todas</option>
+          <option value="electrica">Eléctrica</option>
+          <option value="manual">Manual</option>
+        </select>
+      </label>
+      <label>
+        <span>Marca</span>
+        <select id="downMarca">
+          <option value="all">Todas</option>
+        </select>
+      </label>
+      <button id="downloadCatBtn" type="button" class="btn"><svg class="i">
+          <use href="#i-download" />
+        </svg><span>Descargar (HTML)</span></button>
     </div>
-    
-  </header>
-  
-  <main class="app-main">
-    <!-- HOME: solo selección y acciones -->
-    <section id="view-home" class="card view" aria-label="Inicio">
-      <p class="muted">Selecciona una obra y agrega ítems.</p>
-      <div class="separator"></div>
-    
-      <!-- Formulario AGREGAR ÍTEM (mismo IDs que antes) -->
-      <h2 id="formTitle">Agregar Ítem</h2>
-      <form id="itemForm" class="grid" novalidate>
-        <label><span>Nombre *</span><input id="itemNombre" required /></label>
-        <label><span>Categoría *</span>
-          <select id="itemCategoria" required>
-            <option value="">— Seleccionar —</option>
-            <option value="herramienta">Herramienta</option>
-            <option value="material">Material</option>
-          </select>
-        </label>
-        <label id="subtipoGroup"><span>Subtipo</span>
-          <select id="itemSubtipo">
-            <option value="">—</option>
-            <option value="electrica">Eléctrica</option>
-            <option value="manual">Manual</option>
-          </select>
-        </label>
-        <label><span>Marca *</span>
-          <select id="itemMarca" required>
-            <option value="">—</option>
-            <option value="__new__">Nueva marca…</option>
-          </select>
-        </label>
-        <label id="marcaNuevaWrap" class="hidden"><span>Nueva marca</span><input id="itemMarcaNueva" /></label>
-        <label class="full"><span>Ubicación</span><input id="itemUbicacion" placeholder="ej: Almacén 1 / Estante A" /></label>
-        <label class="full"><span>Observaciones</span><textarea id="itemObservaciones" rows="3" placeholder="Notas adicionales..."></textarea></label>
-        <div class="row">
-          <button id="submitBtn" type="submit" class="btn primary">Agregar ítem</button>
-          <button id="cancelBtn" type="reset" class="btn ghost">Cancelar</button>
-        </div>
-      </form>
-    </section>
-    
-  
-    <!-- INVENTARIO: formulario + tabla (filtros ocultos) -->
-    <section id="view-inventario" class="card view hidden" aria-labelledby="inventario">
-      <div class="row between">
-        <h2 id="inventario">Inventario</h2>
-        <div class="chips">
-          <span class="chip">Visibles <strong id="visibleCount">0</strong></span>
-          <span class="chip">Total <strong id="totalCount">0</strong></span>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th><th>Cat.</th><th>Subtipo</th><th>Cant.</th>
-              <th>Marca</th><th>Ubicación</th><th>Observaciones</th><th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <tr><td colspan="8" class="empty">Selecciona una obra…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    
-  
-    <!-- AYUDA -->
-    <section id="view-ayuda" class="card view hidden" aria-labelledby="como-usar">
-      <h2 id="como-usar">Cómo usar</h2>
-      <ol class="muted">
-        <li>Selecciona una obra en la parte superior.</li>
-        <li>Ve a la pestaña <b>Inventario</b> para añadir y gestionar ítems.</li>
-        <li>Usa la pestaña <b>Datos</b> para exportar o importar JSON.</li>
-      </ol>
-    </section>
-  
-    <!-- DATOS: Exportar / Importar -->
-    <section id="view-datos" class="card view hidden" aria-label="Datos">
-      <h2>Datos</h2>
-      <div class="row wrap">
-        <button id="exportBtn" type="button" class="btn"><svg class="i"><use href="#i-download"/></svg><span>Exportar JSON</span></button>
-        <label for="importFile" class="btn" role="button" aria-controls="importFile"><svg class="i"><use href="#i-upload"/></svg><span>Importar JSON</span></label>
-        <input id="importFile" type="file" accept="application/json" class="hidden" />
-      </div>
-    </section>
+  </section>
   </main>
 
+  <!-- Tabbar -->
   <nav class="tabbar" aria-label="Navegación">
-    <a href="#home" class="tab" id="nav-home"><svg class="i"><use href="#i-home"/></svg><span>Inicio</span></a>
-    <a href="#inventario" class="tab" id="nav-inventario"><svg class="i"><use href="#i-list"/></svg><span>Inventario</span></a>
-    <a href="#ayuda" class="tab" id="nav-ayuda"><svg class="i"><use href="#i-info"/></svg><span>Ayuda</span></a>
-    <a href="#datos" class="tab" id="nav-datos"><svg class="i"><use href="#i-download"/></svg><span>Datos</span></a>
+    <a href="#home" class="tab" id="nav-home"><svg class="i">
+        <use href="#i-home" />
+      </svg><span>Inicio</span></a>
+    <a href="#inventario" class="tab" id="nav-inventario"><svg class="i">
+        <use href="#i-list" />
+      </svg><span>Inventario</span></a>
+    <a href="#categorias" class="tab" id="nav-categorias"><svg class="i">
+        <use href="#i-cats" />
+      </svg><span>Categorías</span></a>
+    <a href="#ayuda" class="tab" id="nav-ayuda"><svg class="i">
+        <use href="#i-info" />
+      </svg><span>Ayuda</span></a>
+    <a href="#datos" class="tab" id="nav-datos"><svg class="i">
+        <use href="#i-download" />
+      </svg><span>Datos</span></a>
   </nav>
-  
 
-  <!-- Modal Obras -->
-  <dialog id="obraModal" aria-labelledby="obraModalTitle">
-    <div class="modal-header">
-      <h3 id="obraModalTitle">Nueva Obra</h3>
-      <button type="button" class="btn-icon" aria-label="Cerrar" data-close>✕</button>
-    </div>
-    <div class="modal-content">
-      <form id="obraForm" novalidate>
-        <label for="obraNombre"><b>Nombre de la Obra *</b></label>
-        <input id="obraNombre" required />
-        <div id="obraNombre-error" class="alert error hidden"></div>
-        <div class="form-actions">
-          <button type="submit" id="obraSubmitBtn" class="btn-dark">Crear Obra</button>
-          <button type="button" id="obraCancelBtn" class="btn-secondary" data-close>Cancelar</button>
-          <button type="button" id="obraDeleteBtn" class="btn-danger hidden">Eliminar Obra</button>
-        </div>
-      </form>
-    </div>
+  <!-- Modal de obras -->
+  <dialog id="obraModal" aria-labelledby="obraModalTitle" aria-modal="true" role="dialog">
+    <form id="obraForm" class="dialog-card" novalidate>
+      <header class="dialog-head">
+        <h3 id="obraModalTitle">Nueva Obra</h3>
+        <button type="button" class="btn ghost close-btn" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="dialog-body">
+        <label class="full"><span>Nombre de la Obra *</span><input id="obraNombre" required /><small
+            id="obraNombre-error" class="error"></small></label>
+      </div>
+      <footer class="dialog-foot">
+        <button id="obraDeleteBtn" type="button" class="btn danger hidden">Eliminar</button>
+        <div class="spacer"></div>
+        <button id="obraCancelBtn" type="button" class="btn ghost close-btn">Cancelar</button>
+        <button id="obraSubmitBtn" type="submit" class="btn primary">Guardar</button>
+      </footer>
+    </form>
   </dialog>
 </body>
 </html>

@@ -297,3 +297,47 @@ dialog::backdrop{ background: rgba(0,0,0,.55); }
   #view-inventario th, #view-inventario td{ line-height:1.35 }
 
 }
+
+/* ==== Compact UI: tipografía y alturas más reducidas ==== */
+html{ font-size: 15px; }
+.app-header{ padding:8px 10px }
+.toolbar{ gap:8px; margin-top:8px }
+.btn{ min-height:40px; padding:8px 12px; }
+.btn.square{ width:46px; height:46px }
+.i{ width:22px; height:22px }
+.card{ padding:10px }
+.app-main{ gap:10px; padding:10px }
+
+/* Evitar scroll horizontal global */
+html,body{ max-width:100%; overflow-x:hidden }
+.app-main,.view,.card{ max-width:100vw }
+
+/* Tabla legible sin apretar letras */
+#view-inventario table{ width:100%; table-layout: fixed }
+#view-inventario th,#view-inventario td{ white-space:normal; word-break:normal; overflow-wrap:anywhere; line-height:1.3 }
+#view-inventario .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch }
+
+/* Cards responsivas para móvil (mejor lectura) */
+@media (max-width:520px){
+#view-inventario thead{ display:none }
+#view-inventario table,#view-inventario tbody,#view-inventario tr,#view-inventario td{ display:block; width:100% }
+#view-inventario tbody tr{ border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:10px; margin-bottom:10px }
+#view-inventario td{ display:grid; grid-template-columns:110px 1fr; gap:6px; padding:6px 0; border:0 }
+#view-inventario td:nth-child(1)::before{ content:'Nombre'; font-weight:600 }
+#view-inventario td:nth-child(2)::before{ content:'Categoría'; font-weight:600 }
+#view-inventario td:nth-child(3)::before{ content:'Subtipo'; font-weight:600 }
+#view-inventario td:nth-child(4)::before{ content:'Cantidad'; font-weight:600 }
+#view-inventario td:nth-child(5)::before{ content:'Marca'; font-weight:600 }
+#view-inventario td:nth-child(6)::before{ content:'Ubicación'; font-weight:600 }
+#view-inventario td:nth-child(7)::before{ content:'Observaciones'; font-weight:600 }
+#view-inventario td:nth-child(8)::before{ content:'Acciones'; font-weight:600 }
+}
+
+/* Modal blanco bien centrado y legible */
+dialog[open]{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:1000 }
+dialog::backdrop{ background:rgba(0,0,0,.55) }
+.dialog-card{ background:#fff !important; color:#0f172a !important; border:1px solid #dfe7f2 !important; border-radius:18px; width:min(520px,92vw); max-height:85vh; display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.45) }
+.dialog-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid #e6eef8; background:#f7faff }
+.dialog-body{ padding:12px 14px; overflow:auto }
+.dialog-foot{ display:flex; align-items:center; gap:8px; padding:12px 14px; border-top:1px solid #e6eef8; background:#f7faff }
+.dialog-head h3{ margin:0; font-size:18px; color:#0b2c4d }
