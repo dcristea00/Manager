@@ -109,27 +109,3 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 
 /* Títulos de vista */
 .view-title{margin:4px 6px 10px}
-
-/* [ANCHOR: TOAST_SUCCESS_STYLE] */
-.toast-success{ color:#0e7a3e !important; }
-
-/* [ANCHOR: SAFARI_CSS_FIXES] */
-input, select, textarea, button { font-size:16px; }
-html { -webkit-text-size-adjust: 100%; }
-.scroll-area { -webkit-overflow-scrolling: touch; overflow:auto; }
-button, a, [role="button"] { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0); }
-.vh-screen { min-height: 100dvh; }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-
-/* [ANCHOR: STICKY_HEADERS_SAFE] */
-.header-sticky { position: sticky; top: 0; z-index: 1000; will-change: transform; transform: translateZ(0); }
-.table-wrap{ overflow:auto; }
-.table thead th, #pivotTable thead th { position: sticky; top: 0; background: var(--card-bg, #fff); }
-
-/* Pivot helpers */
-#pivotTable th, #pivotTable td{ white-space:nowrap; padding:6px 10px; }
-#pivotTable thead th{ position:sticky; top:0 }
-
-/* AutoFill badge */
-.autofill-badge{ margin-left:8px; color:#0e7a3e; font-weight:600; }
-.hidden{ display:none !important; }

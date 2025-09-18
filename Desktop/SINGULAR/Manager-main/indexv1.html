@@ -2,14 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- [ANCHOR: SAFARI_META_VIEWPORT] -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>INVOBRA</title>
   <link rel="stylesheet" href="styles.css" />
   <script defer src="app.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <!-- ICON SPRITES -->
@@ -28,11 +24,9 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 7h4l2-2h4l2 2h4v12H4z" fill="none" stroke-width="2"/><circle cx="12" cy="13" r="4"/></symbol>
   </defs></svg>
 
-  <header class="app-header header-sticky">
+  <header class="app-header">
     <div class="header-row">
       <h1 class="app-title">INVOBRA</h1>
-      <!-- [ANCHOR: AÑADIR_UI_CABECERA_SELECCIONAR_OBRA] -->
-      <small class="hint-select-obra">Seleccionar obra</small>
       <button id="themeToggleBtn" class="btn ghost" aria-label="Cambiar tema"><svg class="i"><use id="themeIcon" href="#i-moon"/></svg></button>
     </div>
     <div class="toolbar" id="obra-toolbar">
@@ -59,10 +53,7 @@
     <section id="view-anadir" class="card view hidden" aria-label="Añadir">
       <h2 id="formTitle">Agregar Ítem</h2>
       <form id="itemForm" class="grid" novalidate>
-        <label><span>Nombre *</span><input id="itemNombre" required />
-          <!-- [ANCHOR: AUTOFILL_APPLIED_UI_BADGE] -->
-          <small id="autofillBadge" class="autofill-badge hidden">Configuración aplicada por nombre</small>
-        </label>
+        <label><span>Nombre *</span><input id="itemNombre" required /></label>
         <label><span>Categoría *</span>
           <select id="itemCategoria" required>
             <option value="">— Seleccionar —</option>
@@ -77,13 +68,6 @@
             <option value="manual">Manual</option>
           </select>
         </label>
-        <div id="powerSourceWrap" class="hidden"> <!-- [ANCHOR: AÑADIR_SUBTIPO_ELECTRICA_POWER_SOURCE] -->
-          <fieldset>
-            <legend>Fuente de energía</legend>
-            <label><input type="radio" name="power_source" value="bateria"> Batería</label>
-            <label><input type="radio" name="power_source" value="corriente"> Corriente</label>
-          </fieldset>
-        </div>
         <label><span>Marca *</span>
           <select id="itemMarca" required>
             <option value="">—</option>
@@ -152,78 +136,21 @@
       </div>
       <div class="separator"></div>
       <div id="catSummary" class="muted"></div>
-      <div id="catResults" class="grid" style="grid-template-columns:1fr;gap:8px"><!-- [ANCHOR: CATEGORIAS_RESULT_CARD_NAME] --></div>
+      <div id="catResults" class="grid" style="grid-template-columns:1fr;gap:8px"></div>
     </section>
 
     <!-- PRECIOS (futuro) -->
     <section id="view-precios" class="card view hidden" aria-label="Precios">
-      <h2 class="view-title">Gestor de Proveedores</h2>
-      <div class="row wrap">
-        <label><span>Tipo</span>
-          <select id="precioTipo">
-            <option value="tool">Herramientas</option>
-            <option value="material">Materiales</option>
-          </select>
-        </label>
-        <label><span>Familia</span>
-          <select id="precioFamilia">
-            <option value="todas">Todas</option>
-            <option value="estructura">Estructura</option>
-            <option value="pladur">Pladur</option>
-            <option value="generales">Generales</option>
-          </select>
-        </label>
-      </div>
-      <div class="table-wrap" id="pivotWrap">
-        <!-- [ANCHOR: PRECIOS_PIVOT_TABLE_RENDER] -->
-        <table id="pivotTable" class="table" aria-describedby="pivotHelp"><thead id="pivotHead"></thead><tbody id="pivotBody"></tbody></table>
-      </div>
-      <small id="pivotHelp" class="muted">Celdas vacías significan precio no disponible.</small>
+      <h2 class="view-title">Precios (próximamente)</h2>
+      <p class="muted">Pantalla reservada para gestionar tarifas y precios.</p>
     </section>
 
     <!-- DATOS (placeholder) -->
     <section id="view-datos" class="card view hidden" aria-label="Datos">
-      <h2 class="view-title">Exportaciones</h2>
-      <div class="row wrap">
-        <label><span>Tipo</span>
-          <select id="datosTipo"><option value="tool">Herramienta</option><option value="material">Material</option></select>
-        </label>
-        <label><span>Obra</span><select id="datosObra"><option value="all">Todas</option></select></label>
-        <label><span>Familia</span>
-          <select id="datosFamilia">
-            <option value="todas">Todas</option>
-            <option value="estructura">Estructura</option>
-            <option value="pladur">Pladur</option>
-            <option value="generales">Generales</option>
-          </select>
-        </label>
-        <label><span>Subtipo</span>
-          <select id="datosSubtipo"><option value="all">Todos</option><option value="electrica">Eléctrica</option><option value="manual">Manual</option></select>
-        </label>
-        <label id="datosPowerWrap" class="hidden"><span>Energía</span>
-          <select id="datosPower"><option value="all">Todas</option><option value="bateria">Batería</option><option value="corriente">Corriente</option></select>
-        </label>
-        <div class="spacer"></div>
-        <button id="exportPdfBtn" class="btn primary"><svg class="i"><use href="#i-download"/></svg><span>Exportar PDF</span></button>
-      </div>
-      <div class="separator"></div>
-      <div id="datosPreview" class="table-wrap"></div>
+      <h2 class="view-title">Datos</h2>
+      <p class="muted">De momento no hay acciones aquí.</p>
     </section>
-  
-    <!-- TRABAJADORES -->
-    <section id="view-trabajadores" class="card view hidden" aria-label="Trabajadores">
-      <h2 class="view-title">Trabajadores</h2>
-      <div class="row wrap">
-        <label><span>Semana que empieza</span>
-          <input id="weekStart" type="date"/>
-        </label>
-        <div class="spacer"></div>
-        <button id="seedWeekBtn" class="btn"><span>Seed semana por defecto</span></button>
-      </div>
-      <div id="trabajadoresList"></div>
-      <!-- [ANCHOR: TRABAJADORES_SEMANA_GRID] -->
-    </section>
-</main>
+  </main>
 
   <!-- TABS -->
   <nav class="tabbar" aria-label="Navegación">
@@ -233,7 +160,6 @@
     <a href="#categorias" class="tab" id="nav-categorias"><svg class="i"><use href="#i-cats"/></svg><span>Categorías</span></a>
     <a href="#precios" class="tab" id="nav-precios"><svg class="i"><use href="#i-coin"/></svg><span>Precios</span></a>
     <a href="#datos" class="tab" id="nav-datos"><svg class="i"><use href="#i-download"/></svg><span>Datos</span></a>
-      <a href="#trabajadores" class="tab" id="nav-trabajadores"><svg class="i"><use href="#i-info"/></svg><span>Trabajadores</span></a>
   </nav>
 
   <!-- MODAL OBRAS -->
