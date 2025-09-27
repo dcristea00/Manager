@@ -15,7 +15,3 @@
 
 [build.environment]
   NODE_VERSION = "20"
-
-
-[functions."item-templates"]
-  included_files = ["netlify/functions/_db.js"]
