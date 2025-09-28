@@ -1,4 +1,3 @@
-
 // ========================================================
 // INVOBRA - Día/Noche + Inicio (fotos) + Inventario compacto + Categorías
 // ========================================================
@@ -24,7 +23,6 @@ function toast(type, msg){
 const state = {
   obras: [],
   items: [], // solo de obra seleccionada
-  allItems: [], // todos los items para autocompletado y categorías
   selectedObraId: localStorage.getItem('obraId') || '',
   editingItemId: '',
 };
@@ -50,7 +48,6 @@ async function init(){
   applyTheme(localStorage.getItem('theme')||'dark');
   bindListeners();
   await loadObras();
-  state.allItems = await API.itemsAll(); // Cargar todos los items para autocompletado y categorías
   renderObrasSelect();
   if (state.selectedObraId) await loadInventario();
   applyRoute();
@@ -71,262 +68,269 @@ function bindListeners(){ if(__bound) return; __bound=true;
   qs('#deleteObraBtn')?.addEventListener('click', async ()=>{ const id=state.selectedObraId; if(!id) return; if(confirm('¿Eliminar esta obra y todo su inventario?')){ await API.obraDelete(id); state.selectedObraId=''; state.items=[]; await loadObras(); renderObrasSelect(); renderObraInfo(); renderTable(); }});
   qs('#obraSelect')?.addEventListener('change', async (e)=>{ state.selectedObraId = e.target.value; localStorage.setItem('obraId', state.selectedObraId||''); renderObrasSelect(); await loadInventario(); renderObraInfo(); });
 
-  // Nueva obra modal
-  qs('#obraModalForm')?.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const name = qs('#obraNameInp').value.trim();
-    const mode = qs('#obraModal').dataset.mode;
-    const id = qs('#obraModal').dataset.id;
-    if(!name) return toast('error','Nombre requerido');
-    try{
-      if(mode==='new'){
-        const obra = await API.obraCreate(name);
-        state.obras.unshift(obra);
-        state.selectedObraId = obra.id;
-        localStorage.setItem('obraId',obra.id);
-        await loadInventario();
-      } else {
-        await API.obraUpdate(id,name);
-        const o = state.obras.find(o=>o.id===id); if(o) o.nombre=name;
-      }
-      renderObrasSelect();
-      renderObraInfo();
-      qs('#obraModal').close();
-      toast('ok','Obra guardada');
-    } catch(e){
-      toast('error',e.message==='Duplicado'?'Nombre duplicado':e.message);
+  // Modal obras
+  const modal = qs('#obraModal');
+  modal?.addEventListener('click', (e)=>{ if(e.target.classList?.contains('close-btn')) closeObraModal(); });
+  modal?.addEventListener('cancel', (e)=>{ e.preventDefault(); closeObraModal(); });
+  qs('#obraCancelBtn')?.addEventListener('click', closeObraModal);
+  qs('#obraForm')?.addEventListener('submit', async (e)=>{ e.preventDefault(); await submitObraForm(); });
+
+  // Form ítem (Añadir)
+  qs('#itemForm')?.addEventListener('submit', async (e)=>{ e.preventDefault(); if(!state.selectedObraId){ toast('error','Selecciona una obra'); return; } await saveNewItem(); });
+  qs('#itemCategoria')?.addEventListener('change', (e)=>{ const stg=qs('#subtipoGroup'); if(stg) stg.style.display = (e.target.value==='herramienta') ? 'block' : 'none'; });
+  qs('#itemMarca')?.addEventListener('change', (e)=>{ const wrap=qs('#marcaNuevaWrap'); if(!wrap) return; if(e.target.value==='__new__'){ show(wrap); qs('#itemMarcaNueva')?.focus(); } else hide(wrap); });
+  qs('#cancelBtn')?.addEventListener('click', resetItemForm);
+
+  // Tabla inventario
+  qs('#tableBody')?.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const tr = btn.closest('tr'); const id = tr?.dataset.id; if(!id) return;
+    const action = btn.dataset.action; const item = state.items.find(i=>i.id===id); if(!item) return;
+
+    if(action==='delete'){
+      if(!confirm('¿Eliminar ítem?')) return; await API.itemDelete(id); await loadInventario(); return;
     }
-  });
-  qs('#obraModalDelBtn')?.addEventListener('click', async ()=>{
-    const id = qs('#obraModal').dataset.id; if(!id) return;
-    if(confirm('¿Eliminar esta obra y todo su inventario?')){
-      await API.obraDelete(id);
-      state.obras = state.obras.filter(o=>o.id!==id);
-      if(state.selectedObraId===id){ state.selectedObraId=''; state.items=[]; }
-      renderObrasSelect();
-      renderObraInfo();
-      renderTable();
-      qs('#obraModal').close();
-      toast('ok','Obra eliminada');
+    if(action==='edit'){
+      state.editingItemId = id; renderTable(); return;
+    }
+    if(action==='save'){
+      const payload = collectRowEdits(tr, item);
+      await API.itemUpdate(id, payload);
+      // ¿se movió de obra?
+      if(payload.obra_id && payload.obra_id !== state.selectedObraId){ toast('ok','Ítem movido a otra obra'); }
+      state.editingItemId=''; await loadInventario(); return;
+    }
+    if(action==='cancel'){
+      state.editingItemId=''; renderTable(); return;
     }
   });
 
-  // Item modal
-  qs('#itemModalForm')?.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const name = qs('#itemNameInp').value.trim();
-    const cat  = qs('#itemCatSel').value;
-    const subt = qs('#itemSubSel').value;
-    const brand= qs('#itemBrandInp').value.trim() || qs('#itemBrandSel').value;
-    const qty  = parseInt(qs('#itemQtyInp').value)||1;
-    const loc  = qs('#itemLocInp').value.trim();
-    const obs  = qs('#itemObsInp').value.trim();
-    if(!name || !cat || !brand) return toast('error','Campos requeridos');
-    const payload = { nombre:name, categoria:cat, subtipo:subt, marca:brand, cantidad:qty, ubicacion:loc, observaciones:obs, obra_id:state.selectedObraId };
-    try{
-      const mode = qs('#itemModal').dataset.mode;
-      if(mode==='new'){
-        const item = await API.itemCreate(payload);
-        state.items.unshift(item);
-      } else {
-        const id = qs('#itemModal').dataset.id;
-        await API.itemUpdate(id, payload);
-        const i = state.items.find(i=>i.id===id); if(i) Object.assign(i,payload);
-      }
-      renderTable();
-      qs('#itemModal').close();
-      toast('ok','Ítem guardado');
-    } catch(e){ toast('error',e.message); }
-  });
-  qs('#itemModalDelBtn')?.addEventListener('click', async ()=>{
-    const id = qs('#itemModal').dataset.id; if(!id) return;
-    if(confirm('¿Eliminar este ítem?')){
-      await API.itemDelete(id);
-      state.items = state.items.filter(i=>i.id!==id);
-      renderTable();
-      qs('#itemModal').close();
-      toast('ok','Ítem eliminado');
-    }
-  });
-
-  // Filtros inventario
-  qs('#invSearchInp')?.addEventListener('input', renderTable);
+  // Router
+  window.addEventListener('hashchange', applyRoute);
 }
 
-// ---------- Carga ----------
-async function loadObras(){
-  try{
-    state.obras = await API.obrasList();
-  } catch(e){ toast('error','Error cargando obras'); }
-}
-async function loadInventario(){
-  if(!state.selectedObraId) return state.items=[];
-  try{
-    state.items = await API.itemsByObra(state.selectedObraId);
-    renderTable();
-  } catch(e){ toast('error','Error cargando inventario'); }
+function applyTheme(mode){
+  document.documentElement.setAttribute('data-theme', mode);
+  localStorage.setItem('theme', mode);
+  const use = qs('#themeIcon'); if(use) use.setAttribute('href', mode==='light' ? '#i-moon' : '#i-sun');
 }
 
-// ---------- Modales ----------
-function openObraModal({mode='new', obra=null}={}){
-  const dlg = qs('#obraModal'); if(!dlg) return;
-  dlg.dataset.mode = mode;
-  dlg.dataset.id = obra?.id||'';
-  qs('#obraNameInp').value = obra?.nombre||'';
-  qs('#obraModalDelBtn').style.display = (mode==='edit')?'inline-flex':'none';
-  dlg.showModal();
-}
-function openItemModal({mode='new', item=null}={}){
-  const dlg = qs('#itemModal'); if(!dlg) return;
-  dlg.dataset.mode = mode;
-  dlg.dataset.id = item?.id||'';
-  qs('#itemNameInp').value = item?.nombre||'';
-  qs('#itemCatSel').value = item?.categoria||'';
-  qs('#itemSubSel').value = item?.subtipo||'';
-  qs('#itemBrandSel').value = item?.marca||'new';
-  qs('#itemBrandInp').value = (item?.marca && qs('#itemBrandSel').value==='new')?item.marca:'';
-  qs('#itemQtyInp').value = item?.cantidad||1;
-  qs('#itemLocInp').value = item?.ubicacion||'';
-  qs('#itemObsInp').value = item?.observaciones||'';
-  toggleBrandInp();
-  toggleSubtipoInp();
-  dlg.showModal();
-}
-
-// ---------- Render ----------
+// ---------- Obras ----------
+async function loadObras(){ try{ state.obras = await API.obrasList(); }catch{ toast('error','No se pudieron cargar obras'); } }
 function renderObrasSelect(){
-  const sel = qs('#obraSelect');
-  if(sel){
-    sel.innerHTML = '<option value="">— Seleccionar —</option>' + state.obras.map(o=>`<option value="${o.id}" ${o.id===state.selectedObraId?'selected':''}>${escapeHtml(o.nombre)}</option>`).join('');
-  }
-  renderObraInfo();
+  const sel = qs('#obraSelect'); if(!sel) return;
+  sel.innerHTML = `<option value="">— Seleccionar Obra —</option>` + state.obras.map(o=>`<option value="${o.id}" ${o.id===state.selectedObraId?'selected':''}>${escapeHtml(o.nombre)}</option>`).join('');
 }
+
+function openObraModal({mode='create', obra=null}={}){
+  const m = qs('#obraModal'); const name = qs('#obraNombre'); const delBtn = qs('#obraDeleteBtn');
+  name.value = obra?.nombre || ''; name.dataset.mode = mode; name.dataset.id = obra?.id || '';
+  qs('#obraModalTitle').textContent = mode==='edit' ? 'Editar Obra' : 'Nueva Obra';
+  if(mode==='edit'){ show(delBtn); delBtn.onclick = async ()=>{ if(confirm('¿Eliminar esta obra y su inventario?')){ await API.obraDelete(obra.id); closeObraModal(); await loadObras(); state.selectedObraId=''; renderObrasSelect(); state.items=[]; renderObraInfo(); renderTable(); } }; }
+  else { hide(delBtn); delBtn.onclick=null; }
+  m.showModal();
+}
+function closeObraModal(){ qs('#obraModal')?.close(); }
+async function submitObraForm(){
+  const nameEl = qs('#obraNombre'); const nombre = nameEl.value.trim(); if(!nombre){ qs('#obraNombre-error').textContent='Nombre requerido'; return; }
+  const mode = nameEl.dataset.mode||'create'; const id = nameEl.dataset.id||'';
+  try{
+    if(mode==='edit'){ await API.obraUpdate(id, nombre); toast('ok','Obra actualizada'); }
+    else { const o = await API.obraCreate(nombre); state.selectedObraId = o.id; localStorage.setItem('obraId', o.id); toast('ok','Obra creada'); }
+    closeObraModal(); await loadObras(); renderObrasSelect(); await loadInventario(); renderObraInfo();
+  }catch(e){ toast('error', e.message||'Error obra'); }
+}
+
+// ---------- Inventario ----------
+async function loadInventario(){
+  if(!state.selectedObraId){ state.items=[]; renderObraInfo(); renderTable(); return; }
+  try{ state.items = await API.itemsByObra(state.selectedObraId); }catch{ state.items=[]; toast('error','No se pudo cargar inventario'); }
+  BRANDS.clear(); state.items.forEach(i=>{ if(i.marca) BRANDS.add(i.marca); });
+  renderBrandsSelect(); renderObraInfo(); renderTable();
+}
+
 function renderObraInfo(){
-  const name = qs('#obraName');
-  const obra = state.obras.find(o=>o.id===state.selectedObraId);
-  if(name) name.textContent = obra?.nombre || 'Selecciona una obra';
-  const btns = qsa('#editObraBtn, #deleteObraBtn');
-  btns.forEach(b=> b.disabled = !state.selectedObraId);
+  const box = qs('#obraInfo'); if(!box) return;
+  if(!state.selectedObraId){ box.innerHTML = '<div class="muted">Selecciona una obra para ver su resumen.</div>'; return; }
+  const obra = state.obras.find(o=>o.id===state.selectedObraId); const items = state.items;
+  const total = items.length; const unidades = items.reduce((s,i)=>s+(i.cantidad||0),0);
+  const cats = Object.entries(group(items, i=>i.categoria)).map(([k,v])=>`${k}: ${v.length}`).join(' · ')||'—';
+  const subs = Object.entries(group(items.filter(i=>i.categoria==='herramienta'), i=>i.subtipo||'—')).map(([k,v])=>`${k}: ${v.length}`).join(' · ')||'—';
+  box.innerHTML = `
+    <div class="row between"><h2 style="margin:0">${escapeHtml(obra?.nombre||'Obra')}</h2><div class="chips"><span class="chip">Ítems ${total}</span><span class="chip">Unid. ${unidades}</span></div></div>
+    <div class="muted" style="margin-top:6px">Categorías: ${escapeHtml(cats)}<br/>Subtipos: ${escapeHtml(subs)}</div>
+  `;
 }
 
-// ---------- Inicio: Grid obras con fotos ----------
-async function renderInicio(){
-  const box = qs('#inicioGrid');
-  if(!box) return;
-  box.innerHTML = state.obras.map(o=>{
-    const img = obraImages[o.id] || 'https://via.placeholder.com/300x200?text='+encodeURIComponent(o.nombre);
-    return `
-      <div class="card-obra" data-id="${o.id}">
-        <img src="${img}" alt="${escapeHtml(o.nombre)}">
-        <div class="meta">${escapeHtml(o.nombre)}</div>
-        <input type="file" accept="image/*" class="hidden" onchange="uploadObraImg(event, '${o.id}')">
-        <button class="btn ghost change i" onclick="qs('[data-id=${o.id}] input').click()">📷</button>
-      </div>
-    `;
-  }).join('');
+function renderBrandsSelect(){
+  const sel = qs('#itemMarca'); if(!sel) return;
+  const opts = ['<option value="">—</option><option value="__new__">Nueva marca…</option>']
+    .concat([...BRANDS].sort().map(b=>`<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`));
+  sel.innerHTML = opts.join('');
 }
-function uploadObraImg(e, id){
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    obraImages[id] = ev.target.result;
-    localStorage.setItem('obraImages',JSON.stringify(obraImages));
-    renderInicio();
+
+async function saveNewItem(){
+  const cat = qs('#itemCategoria').value;
+  const marcaSel = qs('#itemMarca').value;
+  const payload = {
+    obra_id: state.selectedObraId,
+    nombre: qs('#itemNombre').value.trim(),
+    categoria: cat,
+    subtipo: cat==='herramienta' ? (qs('#itemSubtipo').value||null) : null,
+    cantidad: Math.max(0, parseInt(qs('#itemCantidad').value,10) || 0),
+    marca: (marcaSel==='__new__' ? (qs('#itemMarcaNueva').value.trim()) : marcaSel) || '',
+    ubicacion: qs('#itemUbicacion').value.trim() || '',
+    observaciones: qs('#itemObservaciones').value.trim() || ''
   };
-  reader.readAsDataURL(file);
+  if(!payload.nombre || !payload.categoria || !payload.marca){ toast('error','Completa nombre, categoría y marca'); return; }
+  try{ await API.itemCreate(payload); await loadInventario(); resetItemForm(); toast('ok','Ítem agregado'); }
+  catch{ toast('error','No se pudo agregar'); }
 }
 
-// ---------- Añadir: Form + Autocompletado ----------
-function initAnadirView(){
-  const catSel = qs('#itemCatSel');
-  const subWrap = qs('#itemSubWrap');
-  const brandSel = qs('#itemBrandSel');
-  const brandInp = qs('#itemBrandInp');
-  const nameInp = qs('#itemNameInp');
-
-  catSel?.addEventListener('change', toggleSubtipoInp);
-  brandSel?.addEventListener('change', toggleBrandInp);
-
-  // Autocompletado para nombre
-  const suggestions = [...new Set(state.allItems.map(i=>i.nombre))].sort();
-  const datalist = document.createElement('datalist');
-  datalist.id = 'itemSuggestions';
-  datalist.innerHTML = suggestions.map(s=>`<option value="${escapeHtml(s)}">`).join('');
-  nameInp.setAttribute('list','itemSuggestions');
-  nameInp.after(datalist);
-
-  nameInp.addEventListener('input', (e)=>{
-    const val = e.target.value.trim().toLowerCase();
-    if(val.length < 2) return;
-    const match = state.allItems.find(i=>i.nombre.toLowerCase()===val);
-    if(match){
-      catSel.value = match.categoria || '';
-      toggleSubtipoInp();
-      qs('#itemSubSel').value = match.subtipo || '';
-      brandSel.value = 'new';
-      toggleBrandInp();
-      brandInp.value = match.marca || '';
-      // Resto vacío
-      qs('#itemQtyInp').value = 1;
-      qs('#itemLocInp').value = '';
-      qs('#itemObsInp').value = '';
-    }
-  });
-
-  function toggleSubtipoInp(){
-    subWrap.style.display = (catSel.value === 'herramienta') ? 'block' : 'none';
-  }
-  function toggleBrandInp(){
-    brandInp.style.display = (brandSel.value === 'new') ? 'block' : 'none';
-  }
+function resetItemForm(){ ['itemNombre','itemCategoria','itemSubtipo','itemMarca','itemMarcaNueva','itemCantidad','itemUbicacion','itemObservaciones']
+  .forEach(id=>{ const el=qs('#'+id); if(!el) return; if(el.tagName==='SELECT') el.selectedIndex=0; else el.value= (id==='itemCantidad'?'1':''); }); hide(qs('#marcaNuevaWrap'));
 }
 
-// ---------- Inventario: Tabla + Resumen dinámico ----------
 function renderTable(){
-  const box = qs('#invTable');
-  const sum = qs('#invSummary');
-  const search = (qs('#invSearchInp')?.value||'').trim().toLowerCase();
-
-  const filtered = state.items.filter(i=> !search || i.nombre.toLowerCase().includes(search) || i.marca.toLowerCase().includes(search) || i.observaciones.toLowerCase().includes(search) );
-
-  // Resumen dinámico
-  const totalItems = state.items.length;
-  const visibleItems = filtered.length;
-  const totalUnits = state.items.reduce((s,i)=>s+(i.cantidad||0),0);
-  const cats = new Set(state.items.map(i=>i.categoria));
-  const subts = new Set(state.items.filter(i=>i.categoria==='herramienta').map(i=>i.subtipo));
-  sum.textContent = `Visibles ${visibleItems} · Total ${totalItems} · Unidades ${totalUnits} · Categorías ${cats.size} · Subtipos ${subts.size}`;
-
-  const html = filtered.map(i=>`
-    <tr>
-      <td>${escapeHtml(i.nombre)}</td>
-      <td>${escapeHtml(i.categoria)}</td>
-      <td>${escapeHtml(i.subtipo||'—')}</td>
-      <td>${i.cantidad||1}</td>
-      <td>${escapeHtml(i.marca)}</td>
-      <td>${escapeHtml(i.ubicacion||'—')}</td>
-      <td>${escapeHtml(i.observaciones||'—')}</td>
-      <td><button class="btn ghost i" onclick="openItemModal({mode:'edit',item:${JSON.stringify(i)}})">✏️</button></td>
-    </tr>
-  `).join('') || '<tr><td colspan="8" class="empty">Sin ítems</td></tr>';
-
-  box.innerHTML = html;
+  const tbody = qs('#tableBody'); const visEl = qs('#visibleCount'); const totEl = qs('#totalCount');
+  if(!tbody) return;
+  const total = state.items.length; let items = [...state.items];
+  visEl && (visEl.textContent = String(items.length));
+  totEl && (totEl.textContent = String(total));
+  if(!state.selectedObraId){ tbody.innerHTML = '<tr><td colspan="8" class="empty">Selecciona una obra…</td></tr>'; return; }
+  if(items.length===0){ tbody.innerHTML = '<tr><td colspan="8" class="empty">Sin resultados</td></tr>'; return; }
+  tbody.innerHTML = items.map(i=> state.editingItemId===i.id ? rowEditHTML(i) : rowReadHTML(i) ).join('');
 }
 
-// ---------- Categorías: Filtros + Resultados con nombres ----------
-const Cross = { allItems: [], obrasById: new Map(), brands: new Set() };
+function rowReadHTML(i){
+  return `<tr data-id="${i.id}">
+    <td>${escapeHtml(i.nombre)}</td>
+    <td>${i.categoria}</td>
+    <td>${i.subtipo||'—'}</td>
+    <td><strong>${i.cantidad||0}</strong></td>
+    <td>${escapeHtml(i.marca||'')}</td>
+    <td>${escapeHtml(i.ubicacion||'')}</td>
+    <td>${escapeHtml(i.observaciones||'')}</td>
+    <td><div class="row"><button class="btn" data-action="edit">Editar</button><button class="btn danger" data-action="delete">Eliminar</button></div></td>
+  </tr>`;
+}
 
+function rowEditHTML(i){
+  const obrasOpts = state.obras.map(o=>`<option value="${o.id}" ${o.id===i.obra_id?'selected':''}>${escapeHtml(o.nombre)}</option>`).join('');
+  return `<tr data-id="${i.id}">
+    <td><input value="${escapeHtml(i.nombre)}" data-f="nombre" /></td>
+    <td>
+      <select data-f="categoria">
+        <option value="herramienta" ${i.categoria==='herramienta'?'selected':''}>herramienta</option>
+        <option value="material" ${i.categoria==='material'?'selected':''}>material</option>
+      </select>
+    </td>
+    <td>
+      <select data-f="subtipo">
+        <option value="" ${!i.subtipo?'selected':''}>—</option>
+        <option value="electrica" ${i.subtipo==='electrica'?'selected':''}>electrica</option>
+        <option value="manual" ${i.subtipo==='manual'?'selected':''}>manual</option>
+      </select>
+    </td>
+    <td><input type="number" min="0" value="${i.cantidad||0}" data-f="cantidad" /></td>
+    <td><input value="${escapeHtml(i.marca||'')}" data-f="marca" /></td>
+    <td><input value="${escapeHtml(i.ubicacion||'')}" data-f="ubicacion" /></td>
+    <td><input value="${escapeHtml(i.observaciones||'')}" data-f="observaciones" /></td>
+    <td>
+      <div class="row wrap">
+        <select data-f="obra_id">${obrasOpts}</select>
+        <button class="btn" data-action="save">Guardar</button>
+        <button class="btn ghost" data-action="cancel">Cancelar</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function collectRowEdits(tr, original){
+  const get = sel => tr.querySelector(sel);
+  const cat = get('select[data-f="categoria"]').value;
+  const payload = {
+    nombre: get('input[data-f="nombre"]').value.trim(),
+    categoria: cat,
+    subtipo: cat==='herramienta' ? (get('select[data-f="subtipo"]').value||null) : null,
+    cantidad: Math.max(0, parseInt(get('input[data-f="cantidad"]').value,10)||0),
+    marca: get('input[data-f="marca"]').value.trim(),
+    ubicacion: get('input[data-f="ubicacion"]').value.trim(),
+    observaciones: get('input[data-f="observaciones"]').value.trim(),
+  };
+  const obraId = get('select[data-f="obra_id"]').value; if(obraId && obraId!==original.obra_id) payload.obra_id = obraId;
+  return payload;
+}
+
+// ---------- Inicio (grid de obras) ----------
+function renderInicio(){
+  const grid = qs('#inicioGrid'); if(!grid) return;
+  if(!state.obras.length){ grid.innerHTML='<div class="muted">No hay obras. Crea una con el botón "Nueva".</div>'; return; }
+  grid.innerHTML = state.obras.map(o=>{
+    const img = obraImages[o.id] || '';
+    return `<div class="card-obra" data-obra="${o.id}">
+      <img src="${img||'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 400 200\'><rect width=\'400\' height=\'200\' fill=\'%23cfe0f5\'/><text x=\'50%\' y=\'50%\' dominant-baseline=\'middle\' text-anchor=\'middle\' fill=\'%233d5a80\' font-family=\'Arial\' font-size=\'22\'>Sin foto</text></svg>'}" alt="${escapeHtml(o.nombre)}" />
+      <button class="btn change" data-action="foto" title="Cambiar foto"><svg class="i"><use href="#i-camera"/></svg></button>
+      <div class="meta">${escapeHtml(o.nombre)}</div>
+      <input type="file" accept="image/*" class="hidden" />
+    </div>`;
+  }).join('');
+
+  grid.onclick = (e)=>{
+    const card = e.target.closest('.card-obra'); if(!card) return;
+    const id = card.dataset.obra;
+    const change = e.target.closest('[data-action="foto"]');
+    if(change){
+      const input = card.querySelector('input[type="file"]');
+      input.onchange = async ()=>{
+        const f = input.files?.[0]; if(!f) return;
+        const fr = new FileReader(); fr.onload = ()=>{ obraImages[id]=fr.result; localStorage.setItem('obraImages', JSON.stringify(obraImages)); renderInicio(); };
+        fr.readAsDataURL(f);
+      };
+      input.click();
+      return;
+    }
+    // navegar a Añadir con obra seleccionada
+    state.selectedObraId = id; localStorage.setItem('obraId', id); renderObrasSelect(); loadInventario(); location.hash = '#anadir';
+  };
+}
+
+// ---------- Categorías ----------
+// 1) Cargar datos transversales (todas las obras + todos los ítems)
+const Cross = { allItems:null, obrasById:new Map(), brands:new Set() };
+
+async function ensureCrossData(){
+  if(!state.obras?.length){
+    try { state.obras = await API.obrasList(); } catch {}
+  }
+  Cross.obrasById = new Map(state.obras.map(o => [o.id, o]));
+
+  // Intento 1: endpoint de todos los ítems
+  try {
+    const arr = await API.itemsAll();
+    if (!Array.isArray(arr)) throw new Error('bad payload');
+    Cross.allItems = arr;
+  } catch {
+    // Fallback: juntar ítems obra por obra
+    const packs = await Promise.all(
+      state.obras.map(o => API.itemsByObra(o.id).catch(() => []))
+    );
+    Cross.allItems = packs.flat();
+  }
+  Cross.brands = new Set(Cross.allItems.map(i => i.marca).filter(Boolean));
+}
+
+// 2) Inicializar vista Categorías (con filtro de Obra)
 async function initCategoriasView(){
-  Cross.allItems = state.allItems; // Usar allItems cargados
-  Cross.obrasById = new Map(state.obras.map(o=>[o.id,o]));
-  Cross.brands = new Set(Cross.allItems.map(i=>i.marca).filter(Boolean));
+  await ensureCrossData();
 
-  const catSel   = qs('#catSel');
-  const subSel   = qs('#subSel');
-  const subWrap  = qs('#subWrap');
-  const marcaSel = qs('#marcaSel');
-  const obraSel  = qs('#obraSel');
+  const obraSel   = qs('#catObra');
+  const catSel    = qs('#catCategoria');
+  const subWrap   = qs('#catSubtipoWrap');
+  const subSel    = qs('#catSubtipo');
+  const marcaSel  = qs('#catMarca');
 
+  // Poblar obras y marcas (globales)
   if (obraSel) {
     obraSel.innerHTML =
       '<option value="all">Todas</option>' +
@@ -339,19 +343,19 @@ async function initCategoriasView(){
   }
 
   function toggleSubtipo(){
-    subWrap.style.display = (catSel.value === 'herramienta' || catSel.value === 'ambas') ? 'inline-block' : 'none';
+    subWrap.style.display = (catSel.value === 'herramienta') ? 'inline-block' : 'none';
   }
 
   function apply(){
     const obra  = obraSel?.value || 'all';
-    const cat   = catSel.value;                         // ambas | herramienta | material
-    const subt  = subSel.value;                         // ambas | all | electrica | manual
+    const cat   = catSel.value;                         // herramienta | material
+    const subt  = (cat === 'herramienta') ? subSel.value : 'all';  // all | electrica | manual
     const brand = marcaSel.value;                       // all | marca
 
     const filtered = Cross.allItems.filter(i =>
       (obra === 'all' || i.obra_id === obra) &&
-      (cat === 'ambas' || i.categoria === cat) &&
-      (subt === 'ambas' || subt === 'all' || i.subtipo === subt) &&
+      i.categoria === cat &&
+      (cat !== 'herramienta' || subt === 'all' || i.subtipo === subt) &&
       (brand === 'all' || i.marca === brand)
     );
     renderCatResults(filtered, { obra, cat, subt, brand });
@@ -366,7 +370,7 @@ async function initCategoriasView(){
   apply();
 }
 
-// Render compacto de resultados (totales por obra + nombres de ítems)
+// 3) Render compacto de resultados (totales por obra)
 function renderCatResults(items, { obra, cat, subt, brand }){
   const box = qs('#catResults');
   const sum = qs('#catSummary');
@@ -398,7 +402,7 @@ function renderCatResults(items, { obra, cat, subt, brand }){
 
     // Desglose según filtros actuales (compacto, sólo números)
     let extra = '';
-    if ((cat === 'herramienta' || cat === 'ambas') && (subt === 'ambas' || subt === 'all')) {
+    if (cat === 'herramienta' && subt === 'all') {
       const bySubItems = count(arr, i => i.subtipo);
       const bySubUnits = sumUn(arr, i => i.subtipo);
       const e  = bySubItems['electrica'] || 0,  em = bySubUnits['electrica'] || 0;
@@ -419,10 +423,6 @@ function renderCatResults(items, { obra, cat, subt, brand }){
       extra += `<div class="muted">Marca ${escapeHtml(brand)}: ${brandItems.length} (${brandUnits})</div>`;
     }
 
-    // Añadir lista de nombres de ítems
-    const itemNames = arr.map(i => escapeHtml(i.nombre)).sort().join(', ');
-    extra += `<div class="muted">Ítems: ${itemNames || 'Ninguno'}</div>`;
-
     return `
       <div class="card">
         <div class="row between">
@@ -440,58 +440,15 @@ function renderCatResults(items, { obra, cat, subt, brand }){
   box.innerHTML = html;
 }
 
-// ---------- Datos: Descargar PDF ----------
-function initDatosView(){
-  const box = qs('#datosActions');
-  box.innerHTML = `
-    <button class="btn primary" id="downloadPdfBtn">Descargar PDF de Inventario</button>
-  `;
-  qs('#downloadPdfBtn').addEventListener('click', generatePdf);
-}
-
-async function generatePdf(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  doc.setFontSize(18);
-  doc.text('Inventario por Obra', 20, 20);
-  let y = 30;
-
-  for(const obra of state.obras){
-    const items = await API.itemsByObra(obra.id);
-    if(!items.length) continue;
-    doc.setFontSize(14);
-    doc.text(obra.nombre, 20, y);
-    y += 10;
-    doc.setFontSize(10);
-    items.sort((a,b)=>a.nombre.localeCompare(b.nombre)).forEach(i=>{
-      doc.text(`${i.nombre} (${i.categoria}${i.subtipo?`/${i.subtipo}`:''}) - Cant: ${i.cantidad} - Marca: ${i.marca}`, 30, y);
-      y += 8;
-      if(y > 270){ doc.addPage(); y=20; }
-    });
-    y += 10;
-  }
-
-  doc.save(`inventario_${fmtDate().replace(/[\s:\/]/g,'-')}.pdf`);
-}
 
 // ---------- Router ----------
 function showView(name){
-  const views = { inicio:'#view-inicio', anadir:'#view-anadir', inventario:'#view-inventario', categorias:'#view-categorias', datos:'#view-datos' };
+  const views = { inicio:'#view-inicio', anadir:'#view-anadir', inventario:'#view-inventario', categorias:'#view-categorias', precios:'#view-precios', datos:'#view-datos' };
   Object.values(views).forEach(sel=> hide(qs(sel)) );
   show(qs(views[name]||'#view-inicio'));
   qsa('.tab').forEach(t=>t.classList.remove('active')); qs('#nav-'+name)?.classList.add('active');
   // Ocultar toolbar obra en vistas que no la usan
-  const hideTb = (name==='inicio' || name==='categorias' || name==='datos');
+  const hideTb = (name==='inicio' || name==='categorias' || name==='precios' || name==='datos');
   document.body.classList.toggle('hide-toolbar', hideTb);
 }
-async function applyRoute(){ 
-  const name = (location.hash.replace('#','')||'inicio'); 
-  showView(name); 
-  if(name==='inicio') renderInicio(); 
-  if(name==='anadir') initAnadirView();
-  if(name==='inventario') renderTable();
-  if(name==='categorias') await initCategoriasView(); 
-  if(name==='datos') initDatosView();
-}
-
-// Cargar jsPDF para PDF (CDN en index.html)
+async function applyRoute(){ const name = (location.hash.replace('#','')||'inicio'); showView(name); if(name==='inicio') renderInicio(); if(name==='anadir'){} if(name==='inventario'){} if(name==='categorias') await initCategoriasView(); }
