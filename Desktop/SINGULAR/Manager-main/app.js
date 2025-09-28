@@ -23,7 +23,6 @@ function toast(type, msg){
 const state = {
   obras: [],
   items: [], // solo de obra seleccionada
-  allItems: [], // todos los items para sugerencias
   selectedObraId: localStorage.getItem('obraId') || '',
   editingItemId: '',
 };
@@ -41,8 +40,6 @@ const API = {
   async itemCreate(payload){ const r=await fetch('/.netlify/functions/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!r.ok) throw new Error('Crear item'); return r.json(); },
   async itemUpdate(id, payload){ const r=await fetch(`/.netlify/functions/items?id=${encodeURIComponent(id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!r.ok) throw new Error('Actualizar item'); return r.json(); },
   async itemDelete(id){ const r=await fetch(`/.netlify/functions/items?id=${encodeURIComponent(id)}`,{method:'DELETE'}); if(!r.ok) throw new Error('Eliminar item'); return true; },
-  async getItemSuggestions(query){ const r=await fetch(`/.netlify/functions/item-templates?name=${encodeURIComponent(query)}`); if(!r.ok) return null; return r.json(); },
-  async saveItemTemplate(name, category, subtype){ await fetch('/.netlify/functions/item-templates/upsert',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,category,subtype})}); },
 };
 
 // ---------- Inicio ----------
@@ -51,17 +48,9 @@ async function init(){
   applyTheme(localStorage.getItem('theme')||'dark');
   bindListeners();
   await loadObras();
-  await loadAllItems(); // Para sugerencias
   renderObrasSelect();
   if (state.selectedObraId) await loadInventario();
-  // Asegurar que inicie en página Inicio
-  if(!location.hash) location.hash = '#inicio';
   applyRoute();
-}
-
-// ---------- Cargar todos los items para sugerencias ----------
-async function loadAllItems(){
-  try{ state.allItems = await API.itemsAll(); }catch{ state.allItems = []; }
 }
 
 // ---------- Listeners ----------
@@ -86,9 +75,7 @@ function bindListeners(){ if(__bound) return; __bound=true;
   qs('#obraCancelBtn')?.addEventListener('click', closeObraModal);
   qs('#obraForm')?.addEventListener('submit', async (e)=>{ e.preventDefault(); await submitObraForm(); });
 
-  // Form ítem (Añadir) - AUTOCOMPLETADO
-  setupItemNameAutocomplete();
-  
+  // Form ítem (Añadir)
   qs('#itemForm')?.addEventListener('submit', async (e)=>{ e.preventDefault(); if(!state.selectedObraId){ toast('error','Selecciona una obra'); return; } await saveNewItem(); });
   qs('#itemCategoria')?.addEventListener('change', (e)=>{ const stg=qs('#subtipoGroup'); if(stg) stg.style.display = (e.target.value==='herramienta') ? 'block' : 'none'; });
   qs('#itemMarca')?.addEventListener('change', (e)=>{ const wrap=qs('#marcaNuevaWrap'); if(!wrap) return; if(e.target.value==='__new__'){ show(wrap); qs('#itemMarcaNueva')?.focus(); } else hide(wrap); });
@@ -110,11 +97,7 @@ function bindListeners(){ if(__bound) return; __bound=true;
       const payload = collectRowEdits(tr, item);
       await API.itemUpdate(id, payload);
       // ¿se movió de obra?
-      if(payload.obra_id && payload.obra_id !== state.selectedObraId){ 
-        toast('ok','Ítem movido a otra obra'); 
-        // Recargar inventario de la obra actual
-        await loadInventario();
-      }
+      if(payload.obra_id && payload.obra_id !== state.selectedObraId){ toast('ok','Ítem movido a otra obra'); }
       state.editingItemId=''; await loadInventario(); return;
     }
     if(action==='cancel'){
@@ -122,83 +105,8 @@ function bindListeners(){ if(__bound) return; __bound=true;
     }
   });
 
-  // Botón descargar PDF
-  qs('#downloadPdfBtn')?.addEventListener('click', downloadInventarioPDF);
-
   // Router
   window.addEventListener('hashchange', applyRoute);
-}
-
-// ---------- Autocompletado nombre ítem ----------
-function setupItemNameAutocomplete(){
-  const input = qs('#itemNombre');
-  const container = qs('#itemForm');
-  if(!input || !container) return;
-
-  let suggestionsDiv = null;
-
-  input.addEventListener('input', (e) => {
-    const query = e.target.value.trim().toLowerCase();
-    
-    if(suggestionsDiv){
-      suggestionsDiv.remove();
-      suggestionsDiv = null;
-    }
-
-    if(query.length < 2) return;
-
-    // Buscar sugerencias en items existentes
-    const suggestions = [...new Set(state.allItems
-      .filter(item => item.nombre && item.nombre.toLowerCase().includes(query))
-      .map(item => ({
-        nombre: item.nombre,
-        categoria: item.categoria,
-        subtipo: item.subtipo
-      }))
-      .slice(0, 5))];
-
-    if(suggestions.length === 0) return;
-
-    suggestionsDiv = document.createElement('div');
-    suggestionsDiv.className = 'suggestions-dropdown';
-    suggestionsDiv.innerHTML = suggestions.map(s => 
-      `<div class="suggestion-item" data-nombre="${escapeHtml(s.nombre)}" data-categoria="${s.categoria||''}" data-subtipo="${s.subtipo||''}">
-        ${escapeHtml(s.nombre)} <span class="suggestion-meta">(${s.categoria}${s.subtipo ? ' - '+s.subtipo : ''})</span>
-      </div>`
-    ).join('');
-
-    input.parentNode.appendChild(suggestionsDiv);
-
-    // Click en sugerencia
-    suggestionsDiv.addEventListener('click', (e) => {
-      const item = e.target.closest('.suggestion-item');
-      if(!item) return;
-
-      const nombre = item.dataset.nombre;
-      const categoria = item.dataset.categoria;
-      const subtipo = item.dataset.subtipo;
-
-      // Rellenar campos
-      input.value = nombre;
-      qs('#itemCategoria').value = categoria || '';
-      qs('#itemSubtipo').value = subtipo || '';
-
-      // Mostrar/ocultar subtipo según categoría
-      const stg = qs('#subtipoGroup');
-      if(stg) stg.style.display = (categoria === 'herramienta') ? 'block' : 'none';
-
-      suggestionsDiv.remove();
-      suggestionsDiv = null;
-    });
-  });
-
-  // Cerrar sugerencias al hacer click fuera
-  document.addEventListener('click', (e) => {
-    if(!input.contains(e.target) && suggestionsDiv && !suggestionsDiv.contains(e.target)){
-      suggestionsDiv.remove();
-      suggestionsDiv = null;
-    }
-  });
 }
 
 function applyTheme(mode){
@@ -275,16 +183,7 @@ async function saveNewItem(){
     observaciones: qs('#itemObservaciones').value.trim() || ''
   };
   if(!payload.nombre || !payload.categoria || !payload.marca){ toast('error','Completa nombre, categoría y marca'); return; }
-  
-  try{ 
-    await API.itemCreate(payload); 
-    // Guardar template para futuras sugerencias
-    await API.saveItemTemplate(payload.nombre, payload.categoria, payload.subtipo);
-    await loadInventario(); 
-    await loadAllItems(); // Actualizar sugerencias
-    resetItemForm(); 
-    toast('ok','Ítem agregado'); 
-  }
+  try{ await API.itemCreate(payload); await loadInventario(); resetItemForm(); toast('ok','Ítem agregado'); }
   catch{ toast('error','No se pudo agregar'); }
 }
 
@@ -359,47 +258,8 @@ function collectRowEdits(tr, original){
     ubicacion: get('input[data-f="ubicacion"]').value.trim(),
     observaciones: get('input[data-f="observaciones"]').value.trim(),
   };
-  const obraId = get('select[data-f="obra_id"]').value; 
-  if(obraId && obraId!==original.obra_id) payload.obra_id = obraId;
+  const obraId = get('select[data-f="obra_id"]').value; if(obraId && obraId!==original.obra_id) payload.obra_id = obraId;
   return payload;
-}
-
-// ---------- Descargar PDF ----------
-async function downloadInventarioPDF(){
-  if(!state.selectedObraId){ toast('error','Selecciona una obra'); return; }
-  const obra = state.obras.find(o=>o.id===state.selectedObraId);
-  if(!obra){ toast('error','Obra no encontrada'); return; }
-
-  const items = state.items.sort((a,b) => a.nombre.localeCompare(b.nombre));
-  
-  let content = `INVENTARIO - ${obra.nombre.toUpperCase()}\n`;
-  content += `Fecha: ${fmtDate()}\n`;
-  content += `Total de ítems: ${items.length}\n`;
-  content += `Total de unidades: ${items.reduce((s,i)=>s+(i.cantidad||0),0)}\n\n`;
-  content += `${'='.repeat(80)}\n\n`;
-
-  const categorias = group(items, i=>i.categoria);
-  
-  Object.entries(categorias).forEach(([cat, itemsCat]) => {
-    content += `${cat.toUpperCase()}\n`;
-    content += `${'-'.repeat(cat.length)}\n\n`;
-    
-    itemsCat.forEach((item, idx) => {
-      content += `${idx + 1}. ${item.nombre}\n`;
-      if(item.subtipo) content += `   Subtipo: ${item.subtipo}\n`;
-      content += `   Cantidad: ${item.cantidad || 0}\n`;
-      content += `   Marca: ${item.marca || 'N/A'}\n`;
-      if(item.ubicacion) content += `   Ubicación: ${item.ubicacion}\n`;
-      if(item.observaciones) content += `   Observaciones: ${item.observaciones}\n`;
-      content += '\n';
-    });
-    
-    content += '\n';
-  });
-
-  const filename = `inventario_${obra.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
-  downloadFile(filename, 'text/plain', content);
-  toast('ok', 'Inventario descargado');
 }
 
 // ---------- Inicio (grid de obras) ----------
@@ -482,48 +342,22 @@ async function initCategoriasView(){
       [...Cross.brands].sort().map(b => `<option>${escapeHtml(b)}</option>`).join('');
   }
 
-  // Actualizar opciones de categoría y subtipo para incluir "Ambas"
-  catSel.innerHTML = `
-    <option value="ambas">Ambas</option>
-    <option value="herramienta">Herramienta</option>
-    <option value="material">Material</option>
-  `;
-  
-  subSel.innerHTML = `
-    <option value="all">Todas</option>
-    <option value="ambas">Ambas</option>
-    <option value="electrica">Eléctrica</option>
-    <option value="manual">Manual</option>
-  `;
-
   function toggleSubtipo(){
     subWrap.style.display = (catSel.value === 'herramienta') ? 'inline-block' : 'none';
   }
 
   function apply(){
     const obra  = obraSel?.value || 'all';
-    const cat   = catSel.value;                         // ambas | herramienta | material
-    const subt  = (cat === 'herramienta') ? subSel.value : 'all';  // all | ambas | electrica | manual
+    const cat   = catSel.value;                         // herramienta | material
+    const subt  = (cat === 'herramienta') ? subSel.value : 'all';  // all | electrica | manual
     const brand = marcaSel.value;                       // all | marca
 
-    const filtered = Cross.allItems.filter(i => {
-      // Filtro obra
-      if (obra !== 'all' && i.obra_id !== obra) return false;
-      
-      // Filtro categoría
-      if (cat !== 'ambas' && i.categoria !== cat) return false;
-      
-      // Filtro subtipo (solo si categoría es herramienta)
-      if (cat === 'herramienta' && subt !== 'all' && subt !== 'ambas') {
-        if (i.subtipo !== subt) return false;
-      }
-      
-      // Filtro marca
-      if (brand !== 'all' && i.marca !== brand) return false;
-      
-      return true;
-    });
-    
+    const filtered = Cross.allItems.filter(i =>
+      (obra === 'all' || i.obra_id === obra) &&
+      i.categoria === cat &&
+      (cat !== 'herramienta' || subt === 'all' || i.subtipo === subt) &&
+      (brand === 'all' || i.marca === brand)
+    );
     renderCatResults(filtered, { obra, cat, subt, brand });
   }
 
@@ -536,7 +370,7 @@ async function initCategoriasView(){
   apply();
 }
 
-// 3) Render compacto de resultados (totales por obra) + nombres de ítems
+// 3) Render compacto de resultados (totales por obra)
 function renderCatResults(items, { obra, cat, subt, brand }){
   const box = qs('#catResults');
   const sum = qs('#catSummary');
@@ -568,7 +402,7 @@ function renderCatResults(items, { obra, cat, subt, brand }){
 
     // Desglose según filtros actuales (compacto, sólo números)
     let extra = '';
-    if (cat === 'herramienta' && (subt === 'all' || subt === 'ambas')) {
+    if (cat === 'herramienta' && subt === 'all') {
       const bySubItems = count(arr, i => i.subtipo);
       const bySubUnits = sumUn(arr, i => i.subtipo);
       const e  = bySubItems['electrica'] || 0,  em = bySubUnits['electrica'] || 0;
@@ -588,11 +422,6 @@ function renderCatResults(items, { obra, cat, subt, brand }){
       const brandUnits = brandItems.reduce((s,i)=>s+(i.cantidad||0),0);
       extra += `<div class="muted">Marca ${escapeHtml(brand)}: ${brandItems.length} (${brandUnits})</div>`;
     }
-
-    // Lista de nombres de ítems (máximo 10, luego "y X más...")
-    const itemNames = arr.slice(0, 10).map(i => escapeHtml(i.nombre)).join(', ');
-    const moreCount = arr.length > 10 ? ` y ${arr.length - 10} más...` : '';
-    extra += `<div class="item-names"><strong>Ítems:</strong> ${itemNames}${moreCount}</div>`;
 
     return `
       <div class="card">
@@ -614,19 +443,12 @@ function renderCatResults(items, { obra, cat, subt, brand }){
 
 // ---------- Router ----------
 function showView(name){
-  const views = { inicio:'#view-inicio', anadir:'#view-anadir', inventario:'#view-inventario', categorias:'#view-categorias', datos:'#view-datos' };
+  const views = { inicio:'#view-inicio', anadir:'#view-anadir', inventario:'#view-inventario', categorias:'#view-categorias', precios:'#view-precios', datos:'#view-datos' };
   Object.values(views).forEach(sel=> hide(qs(sel)) );
   show(qs(views[name]||'#view-inicio'));
   qsa('.tab').forEach(t=>t.classList.remove('active')); qs('#nav-'+name)?.classList.add('active');
   // Ocultar toolbar obra en vistas que no la usan
-  const hideTb = (name==='inicio' || name==='categorias' || name==='datos');
+  const hideTb = (name==='inicio' || name==='categorias' || name==='precios' || name==='datos');
   document.body.classList.toggle('hide-toolbar', hideTb);
 }
-async function applyRoute(){ 
-  const name = (location.hash.replace('#','')||'inicio'); 
-  showView(name); 
-  if(name==='inicio') renderInicio(); 
-  if(name==='anadir'){} 
-  if(name==='inventario'){} 
-  if(name==='categorias') await initCategoriasView(); 
-}
+async function applyRoute(){ const name = (location.hash.replace('#','')||'inicio'); showView(name); if(name==='inicio') renderInicio(); if(name==='anadir'){} if(name==='inventario'){} if(name==='categorias') await initCategoriasView(); }
