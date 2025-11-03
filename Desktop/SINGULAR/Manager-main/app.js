@@ -382,10 +382,13 @@ async function renderInicio() {
 */
 // Reemplaza SOLO el bloque renderInicio() por este nuevo:
 
+// -- renderInicio() robusto para ratón y táctil (no navega al pulsar cámara / quitar) --
 async function renderInicio() {
   const grid = document.querySelector('#inicioGrid');
   if (!grid) return;
   grid.innerHTML = '';
+
+  let suppressNav = false; // evita navegación al abrir el selector/operar botones
 
   for (const obra of state.obras) {
     const card = document.createElement('div');
@@ -402,7 +405,6 @@ async function renderInicio() {
     const actions = document.createElement('div');
     actions.className = 'row';
 
-    // Botones
     const changeBtn = document.createElement('button');
     changeBtn.type = 'button';
     changeBtn.className = 'btn ghost change';
@@ -420,23 +422,27 @@ async function renderInicio() {
     file.accept = 'image/*';
     file.style.display = 'none';
 
-    // ======== EVENTOS SEGURIZADOS ========
-    changeBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation(); // 🔥 evita propagación total
-      file.click();
+    // ===== Prevención de navegación en táctil/ratón =====
+    const markSuppress = (e) => { suppressNav = true; e.stopPropagation(); };
+    ['pointerdown','touchstart','mousedown'].forEach(ev => {
+      changeBtn.addEventListener(ev, markSuppress, { passive: true });
+      removeBtn.addEventListener(ev, markSuppress, { passive: true });
+      file.addEventListener(ev, markSuppress, { passive: true });
     });
 
-    file.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    });
+    // Abrir selector (no preventDefault; solo evitar burbujeo)
+    changeBtn.addEventListener('click', (e) => { suppressNav = true; e.stopPropagation(); file.click(); });
+
+    // Importantísimo: NO llamar preventDefault en el input file; en desktop lo bloquea
+    file.addEventListener('click', (e) => { suppressNav = true; e.stopPropagation(); });
 
     file.addEventListener('change', async (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
+      e.stopPropagation();
       const f = file.files?.[0];
-      if (!f) return;
+      if (!f) { // el usuario canceló; permitir navegación de nuevos clics
+        setTimeout(() => { suppressNav = false; }, 0);
+        return;
+      }
       try {
         const dataURL = await resizeToMax(f, 1280);
         await PhotoAPI.save(String(obra.id), dataURL);
@@ -446,35 +452,42 @@ async function renderInicio() {
         alertMsg('No se pudo guardar la foto: ' + err.message, 'error');
       } finally {
         file.value = '';
+        // pequeña demora para evitar que el click fantasma de iOS dispare navegación
+        setTimeout(() => { suppressNav = false; }, 300);
       }
     });
 
     removeBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (!confirm('¿Quitar foto de esta obra?')) return;
+      e.stopPropagation();
       try {
-        await PhotoAPI.delete(obra.id);
+        if (!confirm('¿Quitar foto de esta obra?')) { suppressNav = false; return; }
+        await PhotoAPI.delete(String(obra.id));
         img.src = placeholderFromName(obra.nombre);
         alertMsg('Foto eliminada.');
       } catch (err) {
         alertMsg('No se pudo eliminar la foto: ' + err.message, 'error');
+      } finally {
+        setTimeout(() => { suppressNav = false; }, 150);
       }
     });
 
-    // Solo redirige al hacer clic fuera de los botones
+    // Navegación SOLO si el clic no viene de controles
     card.addEventListener('click', (e) => {
-      if (
-        e.target === changeBtn ||
-        e.target === removeBtn ||
-        e.target === file ||
-        e.target.closest('.btn')
-      ) {
-        return; // no redirigir
-      }
+      // si venimos de botones/inputs o está activo el suppression, NO navegamos
+      const path = e.composedPath?.() || [];
+      const hitControl = path.some(el =>
+        el && el.nodeType === 1 && (
+          el === changeBtn || el === removeBtn || el === file ||
+          (el.classList && el.classList.contains('btn')) ||
+          el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'LABEL'
+        )
+      );
+      if (suppressNav || hitControl) return;
+
       state.selectedObraId = String(obra.id);
       localStorage.setItem('selectedObraId', state.selectedObraId);
-      document.querySelector('#obraSelect').value = state.selectedObraId;
+      const sel = document.querySelector('#obraSelect');
+      if (sel) sel.value = state.selectedObraId;
       location.hash = '#inventario';
     });
 
@@ -482,13 +495,14 @@ async function renderInicio() {
     card.append(img, actions, meta, file);
     grid.appendChild(card);
 
-    // Cargar foto desde DB
+    // Cargar foto desde DB (si existe)
     try {
       const p = await PhotoAPI.get(String(obra.id));
       if (p?.data) img.src = p.data;
-    } catch { /* placeholder */ }
+    } catch { /* placeholder si falla */ }
   }
 }
+
 
 
 function placeholderFromName(name) {
