@@ -298,6 +298,7 @@ function openObraModal(obra = null) {
 }
 
 // ================== Inicio (fotos DB + quitar + resize) ==================
+/*
 async function renderInicio() {
   const grid = $.inicioGrid;
   if (!grid) return;
@@ -375,9 +376,120 @@ async function renderInicio() {
     try {
       const p = await PhotoAPI.get(obra.id);
       if (p?.data) img.src = p.data;
+    } catch { // placeholder  }
+  }
+}
+*/
+// Reemplaza SOLO el bloque renderInicio() por este nuevo:
+
+async function renderInicio() {
+  const grid = document.querySelector('#inicioGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  for (const obra of state.obras) {
+    const card = document.createElement('div');
+    card.className = 'card-obra';
+
+    const img = document.createElement('img');
+    img.alt = obra.nombre;
+    img.src = placeholderFromName(obra.nombre);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = obra.nombre;
+
+    const actions = document.createElement('div');
+    actions.className = 'row';
+
+    // Botones
+    const changeBtn = document.createElement('button');
+    changeBtn.type = 'button';
+    changeBtn.className = 'btn ghost change';
+    changeBtn.title = 'Cambiar foto';
+    changeBtn.innerHTML = `<svg class="i"><use href="#i-camera"/></svg>`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn danger ghost';
+    removeBtn.title = 'Quitar foto';
+    removeBtn.innerHTML = `<svg class="i"><use href="#i-trash"/></svg>`;
+
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.accept = 'image/*';
+    file.style.display = 'none';
+
+    // ======== EVENTOS SEGURIZADOS ========
+    changeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation(); // 🔥 evita propagación total
+      file.click();
+    });
+
+    file.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    });
+
+    file.addEventListener('change', async (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const f = file.files?.[0];
+      if (!f) return;
+      try {
+        const dataURL = await resizeToMax(f, 1280);
+        await PhotoAPI.save(String(obra.id), dataURL);
+        img.src = dataURL;
+        alertMsg('Foto actualizada.');
+      } catch (err) {
+        alertMsg('No se pudo guardar la foto: ' + err.message, 'error');
+      } finally {
+        file.value = '';
+      }
+    });
+
+    removeBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!confirm('¿Quitar foto de esta obra?')) return;
+      try {
+        await PhotoAPI.delete(obra.id);
+        img.src = placeholderFromName(obra.nombre);
+        alertMsg('Foto eliminada.');
+      } catch (err) {
+        alertMsg('No se pudo eliminar la foto: ' + err.message, 'error');
+      }
+    });
+
+    // Solo redirige al hacer clic fuera de los botones
+    card.addEventListener('click', (e) => {
+      if (
+        e.target === changeBtn ||
+        e.target === removeBtn ||
+        e.target === file ||
+        e.target.closest('.btn')
+      ) {
+        return; // no redirigir
+      }
+      state.selectedObraId = String(obra.id);
+      localStorage.setItem('selectedObraId', state.selectedObraId);
+      document.querySelector('#obraSelect').value = state.selectedObraId;
+      location.hash = '#inventario';
+    });
+
+    actions.append(changeBtn, removeBtn);
+    card.append(img, actions, meta, file);
+    grid.appendChild(card);
+
+    // Cargar foto desde DB
+    try {
+      const p = await PhotoAPI.get(String(obra.id));
+      if (p?.data) img.src = p.data;
     } catch { /* placeholder */ }
   }
 }
+
 
 function placeholderFromName(name) {
   const initials = (name.match(/\b\p{L}/gu) || []).slice(0, 2).join('').toUpperCase();
