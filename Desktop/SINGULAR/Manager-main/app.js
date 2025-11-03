@@ -39,22 +39,42 @@ const updateItem = (id, data) => apiSend(API.items, 'PUT', { id, ...data });
 const deleteItemApi = (id) => apiSend(API.items, 'DELETE', { id });
 
 // Fotos de obra (DB)
+// app.js — reemplaza SOLO este bloque PhotoAPI por el de abajo
 const PhotoAPI = {
   async get(obraId) {
-    const r = await fetch(`${API.photos}?obra_id=${encodeURIComponent(obraId)}`, { cache: 'no-store' });
+    const id = encodeURIComponent(String(obraId));
+    const r = await fetch(`${API.photos}?obra_id=${id}`, { cache: 'no-store' });
     if (r.status === 404) return null;
-    if (!r.ok) throw new Error(await r.text());
-    return r.json(); // { obra_id, data, updated_at }
+    if (!r.ok) {
+      const t = await r.text().catch(()=>'');
+      throw new Error(`GET foto ${id}: ${t || r.status}`);
+    }
+    return r.json();
   },
   async save(obraId, dataURL) {
-    return apiSend(API.photos, 'POST', { obra_id: obraId, data: dataURL }); // UPSERT
+    const body = { obra_id: String(obraId), data: dataURL };
+    const r = await fetch(API.photos, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(()=>'');
+      throw new Error(`SAVE foto ${obraId}: ${t || r.status}`);
+    }
+    return r.json();
   },
   async delete(obraId) {
-    const r = await fetch(`${API.photos}?obra_id=${encodeURIComponent(obraId)}`, { method: 'DELETE' });
-    if (!r.ok && r.status !== 204) throw new Error(await r.text());
+    const id = encodeURIComponent(String(obraId));
+    const r = await fetch(`${API.photos}?obra_id=${id}`, { method: 'DELETE' });
+    if (!(r.ok || r.status === 204)) {
+      const t = await r.text().catch(()=>'');
+      throw new Error(`DELETE foto ${obraId}: ${t || r.status}`);
+    }
     return true;
   },
 };
+
 
 // ================== Estado/UI refs ==================
 const $ = {
